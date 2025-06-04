@@ -36,7 +36,7 @@ EXPORTS = [
 
 subprocess.run(['cp', 'stage1.js', '..'], check=True)
 subprocess.run(['rm', 'stage1.js'], check=True)
-subprocess.run(['rm', 'stage1.o'], check=True)
-subprocess.run(['rm', 'stage1_sc.h'], check=True)
+# subprocess.run(['rm', 'stage1.o'], check=True)
+# subprocess.run(['rm', 'stage1_sc.h'], check=True)
 # subprocess.run(['rm', 'stage1.bin'], check=True)
-subprocess.run(['rm', 'stage1'], check=True)
+# subprocess.run(['rm', 'stage1'], check=True)

