@@ -18,6 +18,8 @@ const offsets_obj = {
 
     __ZZ6dlopenE1p: undefined,
     dlopen_internal: undefined,
+    __ZL25sNotifyMonitoringDyldMain: undefined,
+    __ZN4dyldL24notifyMonitoringDyldMainEv: undefined,
     cookieAddr: undefined,
 
     stackloader: undefined,
@@ -50,6 +52,8 @@ const offsets_obj = {
 
             this.__ZZ6dlopenE1p = 0x39BFA9E8;
             this.dlopen_internal = 0xc918;
+            this.__ZL25sNotifyMonitoringDyldMain = 0x37942080;
+            this.__ZN4dyldL24notifyMonitoringDyldMainEv = 0x8a1c;
             this.cookieAddr = (0x8ECA0 + 0x38);
 
             this.stackloader = 0x9594;

