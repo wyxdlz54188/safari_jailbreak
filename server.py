@@ -104,6 +104,19 @@ async def stage1(request):
         js_content = await f.read()
     return web.Response(text=js_content, headers=headers)
 
+async def offsets(request):
+    headers = CIMultiDict(
+        {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Content-Type': 'text/javascript',
+        }
+    )
+    async with aiofiles.open('offsets.js', mode='r') as f:
+        js_content = await f.read()
+    return web.Response(text=js_content, headers=headers)
+
 async def wshandler(request):
     ws = web.WebSocketResponse()
     await ws.prepare(request)
@@ -131,6 +144,7 @@ try:
     app.router.add_get('/helper.js', helper)
     app.router.add_get('/pwn.js', pwn)
     app.router.add_get('/stage1.js', stage1)
+    app.router.add_get('/offsets.js', offsets)
     app.router.add_get('/WebSocket', wshandler)
     web.run_app(app, host='0.0.0.0', port=1337)
 except KeyboardInterrupt:
