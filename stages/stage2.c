@@ -31,7 +31,7 @@ int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *a
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
     int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
-    asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] posix_spawn ret: %d", rv);
+    // asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] posix_spawn ret: %d", rv);
     if (rv) return rv;
     
     return 0;

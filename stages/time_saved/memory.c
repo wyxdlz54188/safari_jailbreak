@@ -32,7 +32,7 @@ size_t kread(uint64_t where, void *p, size_t size) {
         }
         rv = mach_vm_read_overwrite(tfpzero, where + offset, chunk, (mach_vm_address_t)p + offset, &sz);
         if (rv || sz == 0) {
-            printf("[-] error on kread(0x%016llx)\n", where);
+            // printf("[-] error on kread(0x%016llx)\n", where);
             break;
         }
         offset += sz;

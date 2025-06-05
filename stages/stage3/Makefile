@@ -12,7 +12,7 @@ include $(THEOS)/makefiles/common.mk
 TOOL_NAME = stage3
 
 stage3_FILES = main.m
-stage3_CFLAGS = -fobjc-arc
+stage3_CFLAGS = -fobjc-arc -Oz
 stage3_CODESIGN_FLAGS = -Sentitlements.plist
 stage3_INSTALL_PATH = /usr/local/bin
 

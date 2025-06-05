@@ -47,12 +47,12 @@ mach_port_t new_port(void) {
     mach_port_t port;
     kern_return_t rv = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
     if (rv) {
-        printf("[-] Failed to allocate port (%s)\n", mach_error_string(rv));
+        // printf("[-] Failed to allocate port (%s)\n", mach_error_string(rv));
         return MACH_PORT_NULL;
     }
     rv = mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND);
     if (rv) {
-        printf("[-] Failed to insert right (%s)\n", mach_error_string(rv));
+        // printf("[-] Failed to insert right (%s)\n", mach_error_string(rv));
         return MACH_PORT_NULL;
     }
     
@@ -64,13 +64,13 @@ mach_port_t new_mach_port() {
     mach_port_t port = MACH_PORT_NULL;
     kern_return_t ret = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
     if (ret) {
-        printf("[-] failed to allocate port\n");
+        // printf("[-] failed to allocate port\n");
         return MACH_PORT_NULL;
     }
     
     mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND);
     if (ret) {
-        printf("[-] failed to insert right\n");
+        // printf("[-] failed to insert right\n");
         mach_port_destroy(mach_task_self(), port);
         return MACH_PORT_NULL;
     }
@@ -79,7 +79,7 @@ mach_port_t new_mach_port() {
     limits.mpl_qlimit = MACH_PORT_QLIMIT_LARGE;
     ret = mach_port_set_attributes(mach_task_self(), port, MACH_PORT_LIMITS_INFO, (mach_port_info_t)&limits, MACH_PORT_LIMITS_INFO_COUNT);
     if (ret) {
-        printf("[-] failed to increase queue limit\n");
+        // printf("[-] failed to increase queue limit\n");
         mach_port_destroy(mach_task_self(), port);
         return MACH_PORT_NULL;
     }
@@ -102,7 +102,7 @@ kern_return_t send_message(mach_port_t destination, void *buffer, mach_msg_size_
     
     kern_return_t ret = mach_msg(&msg->hdr, MACH_SEND_MSG, msg_size, 0, MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     if (ret) {
-        printf("[-] failed to send message\n");
+        // printf("[-] failed to send message\n");
         mach_port_destroy(mach_task_self(), destination);
         free(msg);
         return ret;
@@ -118,7 +118,7 @@ struct simple_msg* receive_message(mach_port_t source, mach_msg_size_t size) {
  
     kern_return_t ret = mach_msg(&msg->hdr, MACH_RCV_MSG, 0, msg_size, source, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     if (ret) {
-        printf("[-] failed to receive message\n");
+        // printf("[-] failed to receive message\n");
         return NULL;
     }
     
@@ -150,7 +150,7 @@ int send_ool_ports(mach_port_t where, int count) {
     free(ports);
     
     if (ret) {
-        printf("[-] Failed to send OOL message: 0x%x (%s)\n", ret, mach_error_string(ret));
+        // printf("[-] Failed to send OOL message: 0x%x (%s)\n", ret, mach_error_string(ret));
         return KERN_FAILURE;
     }
     return 0;
