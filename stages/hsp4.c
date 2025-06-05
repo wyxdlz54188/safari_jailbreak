@@ -19,7 +19,7 @@ extern uint64_t kernel_slide;
 
 
 uint64_t IPCSpaceKernel() {
-    return rk64(find_port(mach_task_self()) + 0x60);
+    return rk64(find_port(mach_task_self()) + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_RECEIVER));
 }
 
 bool PatchHostPriv(mach_port_t host) {

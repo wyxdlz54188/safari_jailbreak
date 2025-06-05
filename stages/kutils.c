@@ -15,18 +15,18 @@
 #include "csblob.h"
 
 void set_csflags(uint64_t proc) {
-    uint32_t csflags = rk32(proc + 0x290);//offsetof_p_csflags);
+    uint32_t csflags = rk32(proc + koffset(KSTRUCT_OFFSET_PROC_CSFLAGS));
     csflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
-    wk32(proc + 0x290, csflags);
+    wk32(proc + koffset(KSTRUCT_OFFSET_PROC_CSFLAGS), csflags);
 }
 
 void set_tfplatform(uint64_t proc) {
     // task.t_flags & TF_PLATFORM
-    uint64_t task = rk64(proc + 0x10);//offsetof_task);
-    uint32_t t_flags = rk32(task + 0x390);//offsetof_t_flags);
+    uint64_t task = rk64(proc + koffset(KSTRUCT_OFFSET_PROC_TASK));
+    uint32_t t_flags = rk32(task + koffset(KSTRUCT_OFFSET_TASK_FLAGS));
     
     t_flags |= TF_PLATFORM;
-    wk32(task+0x390, t_flags);
+    wk32(task+koffset(KSTRUCT_OFFSET_TASK_FLAGS), t_flags);
 
 }
 

