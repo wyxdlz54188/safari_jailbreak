@@ -55,7 +55,8 @@ typedef enum {
     
     OFFSET_GETFI,
 
-    KOFFSET_ZONE_MAP_REF
+    KOFFSET_ZONE_MAP_REF,
+    KOFFSET_TRUSTCACHE
 } kstruct_offset;
 
 uint64_t koffset(kstruct_offset offset);

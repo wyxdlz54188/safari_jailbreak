@@ -79,7 +79,7 @@ size_t kwrite(uint64_t where, const void *p, size_t size) {
         }
         rv = mach_vm_write(tfpzero, where + offset, (mach_vm_offset_t)p + offset, (int)chunk);
         if (rv) {
-            printf("[-] error on kwrite(0x%016llx)\n", where);
+            // printf("[-] error on kwrite(0x%016llx)\n", where);
             break;
         }
         offset += chunk;

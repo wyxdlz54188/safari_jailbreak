@@ -58,6 +58,7 @@ uint64_t kstruct_offsets_12_0[] = {
     0xb7,  // getExternalTrapForIndex
 
     0xFFFFFFF0088957E8,   // KOFFSET_ZONE_MAP_REF
+    0xfffffff008930e80,   // KOFFSET_TRUSTCACHE
 };
 
 

@@ -10,3 +10,4 @@ pwn.js.qw1201
 *.nam
 *.til
 .vscode/settings.json
+/stages/stage3/.theos

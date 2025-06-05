@@ -22,6 +22,8 @@ uint64_t self_struct_task = 0;
 uint64_t self_struct_proc = 0;
 uint64_t kern_struct_task = 0;
 uint64_t kern_struct_proc = 0;
+uint64_t launchd_struct_task = 0;
+uint64_t launchd_struct_proc = 0;
 uint64_t our_task_addr = 0;
 
 static inline uint32_t mach_port_waitq_flags() {
@@ -290,7 +292,12 @@ retry:;
     
     while (struct_task) {
         uint64_t bsd_info = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
-        if (kr32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID)) == 0) {
+        if (kr32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID)) == 1) {
+            kernel_vm_map = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
+            launchd_struct_proc = bsd_info;
+            launchd_struct_task = struct_task;
+        } 
+        else if (kr32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID)) == 0) {
             kernel_vm_map = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
             kern_struct_proc = bsd_info;
             kern_struct_task = struct_task;
