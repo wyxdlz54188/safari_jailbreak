@@ -6,15 +6,15 @@
 #include "common.h"
 #include "time_saved/time_saved.h"
 #include <asl.h>
+#include <CoreFoundation/CoreFoundation.h>
 
 int main() {
-  
+  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] loaded");
 
   int tfpzero = start_time_saved();
   asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] tfp0 = 0x%x\n", tfpzero);
 
   return 0;
 }
-
 
 uint64_t entry[] = { MAGIC, (uint64_t)&main };

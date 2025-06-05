@@ -7,6 +7,8 @@ const offsets_obj = {
     LIBSYSTEM_KERNEL_BASE: undefined,
     LIBDYLD_BASE: undefined,
 
+    dlsym: undefined,
+
     __MergedGlobals_52: undefined,
     memPoolStart: undefined,
     memPoolEnd: undefined,
@@ -40,6 +42,8 @@ const offsets_obj = {
             this.LIBSYSTEM_PLATFORM_BASE = 0x8CCE000;
             this.LIBSYSTEM_KERNEL_BASE = 0x8D5D000;
             this.LIBDYLD_BASE = 0x8E88000;
+
+            this.dlsym = 0x4A08;
 
             this.__MergedGlobals_52 = 0x32559040;
             this.memPoolStart = 0xC8;
