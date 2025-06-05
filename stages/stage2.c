@@ -16,6 +16,7 @@
 #include "trustcache.h"
 #include "hsp4.h"
 #include "kutils.h"
+#include <inttypes.h>
 
 char stage3_path[1024];
 
@@ -39,7 +40,8 @@ int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, 
     uint64_t spawned_ucred = rk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
     wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
 
-    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {};
+    
+    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {}; ////wait until stage3 get hsp4
 
     //restore
     wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), spawned_ucred);
@@ -103,7 +105,10 @@ int main() {
   uint64_t saved_sb = rk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT));
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), 0);
 
-  launch_stage3(stage3_path, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+  char kernel_base_str[19];
+  memset(kernel_base_str, 0, 19);
+  snprintf(kernel_base_str, sizeof(kernel_base_str), "0x%016" PRIx64, kernel_base);
+  launch_stage3(stage3_path, kernel_base_str, NULL, NULL, NULL, NULL, NULL, NULL);
 
   //restore sandbox
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);
