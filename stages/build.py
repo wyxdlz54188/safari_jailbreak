@@ -2,6 +2,7 @@
 
 import subprocess
 
+subprocess.run(['make', 'clean'], check=True)
 subprocess.run(['make'], check=True)
 
 # Convert the stages to a JS array literal
