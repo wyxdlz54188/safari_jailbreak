@@ -14,6 +14,8 @@
 #include <spawn.h>
 #include "csblob.h"
 
+extern uint64_t kern_struct_proc;
+
 void set_csflags(uint64_t proc) {
     uint32_t csflags = rk32(proc + koffset(KSTRUCT_OFFSET_PROC_CSFLAGS));
     csflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
@@ -27,7 +29,6 @@ void set_tfplatform(uint64_t proc) {
     
     t_flags |= TF_PLATFORM;
     wk32(task+koffset(KSTRUCT_OFFSET_TASK_FLAGS), t_flags);
-
 }
 
 const uint64_t kernel_address_space_base = 0xffff000000000000;
@@ -39,4 +40,20 @@ void Kernel_memcpy(uint64_t dest, uint64_t src, uint32_t length) {
         // copy from kernel
         kread(src, (void*)dest, length);
     }
+}
+
+uint64_t proc_of_pid(pid_t pid) {
+    uint64_t proc = kern_struct_proc;
+    
+    while (true) {
+        if(rk32(proc + koffset(KSTRUCT_OFFSET_PROC_PID)) == pid) {
+            return proc;
+        }
+        proc = rk64(proc + 8 /*off_p_list_le_prev*/);
+        if(!proc) {
+            return -1;
+        }
+    }
+    
+    return 0;
 }

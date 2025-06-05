@@ -4,6 +4,7 @@ import subprocess
 
 # Build stage3
 subprocess.run(['make', 'clean'], check=True, cwd='stage3')
+subprocess.run(['rm', '-rf', '.theos'], check=True, cwd='stage3')
 subprocess.run(['make'], check=True, cwd='stage3')
 subprocess.run(['ldid', '-S', '-M', '-Ksigncert.p12', '.theos/obj/arm64/stage3'], check=True, cwd='stage3')
 subprocess.run(['./PayloadMaker.py', '.theos/obj/arm64/stage3', '../stage3.h'], check=True, cwd='stage3')
