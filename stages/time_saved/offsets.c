@@ -6,9 +6,9 @@
 #include "time_saved.h"
 
 #include "offsets.h"
-int* offsets = NULL;
+uint64_t* offsets = NULL;
 
-int kstruct_offsets_12_0[] = {
+uint64_t kstruct_offsets_12_0[] = {
     0xb,   // KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE,
     0x10,  // KSTRUCT_OFFSET_TASK_REF_COUNT,
     0x14,  // KSTRUCT_OFFSET_TASK_ACTIVE,
@@ -56,12 +56,14 @@ int kstruct_offsets_12_0[] = {
     0xdd0, // IOSURFACE_CREATE_OUTSIZE
     
     0xb7,  // getExternalTrapForIndex
+
+    0xFFFFFFF0088957E8,   // KOFFSET_ZONE_MAP_REF
 };
 
 
-int koffset(kstruct_offset offset) {
+uint64_t koffset(kstruct_offset offset) {
     if (offsets == NULL) {
-        printf("[-] Please call init_offsets() prior to querying offsets\n");
+        // printf("[-] Please call init_offsets() prior to querying offsets\n");
         return 0;
     }
     return offsets[offset];

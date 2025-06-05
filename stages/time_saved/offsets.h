@@ -54,9 +54,11 @@ typedef enum {
     IOSURFACE_CREATE_OUTSIZE,
     
     OFFSET_GETFI,
+
+    KOFFSET_ZONE_MAP_REF
 } kstruct_offset;
 
-int koffset(kstruct_offset offset);
+uint64_t koffset(kstruct_offset offset);
 int init_offsets(void);
 
 #endif /* offsets_h */

