@@ -9,4 +9,4 @@ pwn.js.qw1201
 *.id1
 *.nam
 *.til
-/stage1/stage1
+.vscode/settings.json

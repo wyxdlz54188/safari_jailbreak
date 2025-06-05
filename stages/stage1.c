@@ -24,22 +24,43 @@ void fail(uint64_t x) {
 typedef void* (*t_dlsym)(void* handle, const char* symbol);
 typedef int (*t_asl_log)(void*, void*, int, const char*, ...);
 
+#define IS_DEBUG 0
 
 void performJITMemcpy(t_dlsym _dlsym, void* dst, void* src, size_t size) {
+#if IS_DEBUG
     t_asl_log _asl_log = (t_asl_log)_dlsym(RTLD_DEFAULT, "asl_log");
+    _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] Called performJITMemcpy: 0x%llx 0x%llx 0x%x", dst, src, size);
+#endif
 
     uint64_t _jitWriteSeparateHeapsFunctionAddr = *(int64_t *)_dlsym(RTLD_DEFAULT, "_ZN3JSC29jitWriteSeparateHeapsFunctionE");
     uint64_t (*_startOfFixedExecutableMemoryPoolImplEv)(void) = _dlsym(RTLD_DEFAULT, "_ZN3JSC36startOfFixedExecutableMemoryPoolImplEv");
 
-    _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] jitWriteSeparateHeapsFunctionAddr: 0x%llx", _jitWriteSeparateHeapsFunctionAddr);
     uint64_t memPoolStart = _startOfFixedExecutableMemoryPoolImplEv();
+
+ #if IS_DEBUG
+    _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] jitWriteSeparateHeapsFunctionAddr: 0x%llx", _jitWriteSeparateHeapsFunctionAddr);
     _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] memPoolStart: 0x%llx", memPoolStart);
+#endif
     
     void (*_jitWriteSeparateHeapsFunction)(const void *, const void*, size_t) = (void*)_jitWriteSeparateHeapsFunctionAddr;
 
     _jitWriteSeparateHeapsFunction(dst - memPoolStart, src, size);
+    // size_t offset = 0;
+    // #define CHUNK_SIZE 0x4000  // 4KB
 
+    // while (size > 0) {
+    //     size_t chunkSize = size > CHUNK_SIZE ? CHUNK_SIZE : size;
+
+    //     _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] _jitWriteSeparateHeapsFunction: 0x%llx", chunkSize);
+    //     _jitWriteSeparateHeapsFunction((dst + offset) - memPoolStart, src + offset, chunkSize);
+
+    //     offset += chunkSize;
+    //     size -= chunkSize;
+    // }
+
+#if IS_DEBUG
     _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] _jitWriteSeparateHeapsFunction done");
+#endif
 }
 
 static inline uintptr_t read_uleb128(uint8_t** pp, uint8_t* end)
@@ -219,7 +240,10 @@ void bindit(struct dyld_info_command* dyld_info,
     }
 }
 
-void load(void* buffer, t_dlsym _dlsym, void* jitend, uint64_t jitstart) {
+void load(void* buffer, t_dlsym _dlsym, void* jitend) {
+    t_asl_log _asl_log = (t_asl_log)_dlsym(RTLD_DEFAULT, "asl_log");
+    _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] loaded");
+    
 #   define FOR_COMMAND \
         lc = (void*)(header + 1); \
         for (int i = 0; i < header->ncmds; ++i, lc = (void*)((char*)lc + lc->cmdsize)) { \
@@ -249,6 +273,8 @@ void load(void* buffer, t_dlsym _dlsym, void* jitend, uint64_t jitstart) {
     uint32_t* x = (uint32_t*)buffer;
     while (*x != 0xfeedfacf)
         x--;
+    
+    // _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] Found macho: %p", x);
 
     struct mach_header_64* header = (struct mach_header_64*)x;
     struct load_command* lc;

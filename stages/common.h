@@ -3,14 +3,8 @@
 
 #include <stdint.h>
 #include <mach/mach.h>
-#include <Foundation/Foundation.h>
 
 #define MAGIC 0xdeadbeefdeadbeefull
-#ifdef RELEASE
-#   define LOG(str, args...) do { } while(0)
-#else
-#   define LOG(str, args...) do { NSLog(@"[%s] " str, __func__, ##args); } while(0)
-#endif
 
 extern kern_return_t bootstrap_look_up(mach_port_t bp, char *name, mach_port_t *sp);
 extern mach_port_t mach_reply_port(void);
