@@ -9,6 +9,10 @@
 #import "remount.h"
 #import "stage3.h"
 #import "bootstrap.h"
+#import "start_jailbreakd.h"
+
+extern uint64_t g_kbase;
+extern uint64_t g_kernproc;
 
 int rejailbreak_chimera(void) {
     offsets_init();
@@ -37,6 +41,10 @@ int rejailbreak_chimera(void) {
 
     //TODO: prepare tar, rm, basebinaries.tar, and launchctl
     extract_bootstrap();
+
+    int jailbreakd_status = start_jailbreakd(g_kbase, g_kernproc, kernelsignpost_addr);
+    LOG(@"jailbreakd_status = %d", jailbreakd_status);
+    if(jailbreakd_status != 0)     goto err;
 
 
     LOG(@"done rejailbreak_chimera");sleep(3);
