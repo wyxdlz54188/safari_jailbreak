@@ -90,7 +90,6 @@ void kfree(uint64_t kaddr, size_t sz) {
 
 void rkbuffer(uint64_t kaddr, void* buffer, uint32_t length) {
     kern_return_t err;
-    uint32_t val = 0;
     mach_vm_size_t outsize = 0;
     err = mach_vm_read_overwrite(hsp4,
                                  (mach_vm_address_t)kaddr,
