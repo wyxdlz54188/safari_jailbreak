@@ -73,6 +73,7 @@ int rejailbreak_chimera(void) {
         break;
       usleep(100000);
     }
+    LOG(@"jailbreakd_client called success 1");
 
     // jailbreakd_client, launchd
     const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", NULL};
@@ -88,20 +89,24 @@ int rejailbreak_chimera(void) {
         break;
       usleep(100000);
     }
+    LOG(@"jailbreakd_client called success 2");
 
     // inject_criticald, 1, /chimera/pspawn_payload.dylib
     const char* args_inject_criticald[] = {"inject_criticald", "1", "/chimera/pspawn_payload.dylib", NULL};
     rv = posix_spawn(&pd, "/chimera/inject_criticald", NULL, NULL, (char **)&args_inject_criticald, NULL);
     waitpid(pd, NULL, 0);
+    LOG(@"inject_criticald called success");
 
     dlopen("/usr/lib/pspawn_payload-stg2.dylib", RTLD_NOW);
 
     //maybe_setup_smth()    //SKIP for now...
 
     update_springboard_plist();
+    LOG(@"update_springboard_plist called");
 
     pid_t cfprefsd_pid = pid_by_name("cfprefsd");
     kill(cfprefsd_pid, 9);
+    LOG(@"cfprefsd killed");
 
     uint64_t launchd_vnode = get_vnode_at_path("/sbin/launchd");
     uint32_t launchd_v_use_count = kread32(launchd_vnode + off_vnode_v_usecount);
@@ -115,16 +120,16 @@ int rejailbreak_chimera(void) {
     if(is_enabled_tweak) {
         unlink("/.disable_tweakinject");
         startDaemons();
+        LOG(@"done rejailbreak_chimera, userspace rebooting now!");
         usleep(100000u);
+        unborrow_cr_label(getpid(), our_cr_label);
+        run("/chimera/launchctl reboot userspace");
     } else {
         int disable_tweakinject_fd = open("/.disable_tweakinject", O_RDWR | O_CREAT);
         close(disable_tweakinject_fd);
+        LOG(@"done rejailbreak_chimera, disabled tweak injection...");
+        unborrow_cr_label(getpid(), our_cr_label);
     }
-
-    unborrow_cr_label(getpid(), our_cr_label);
-    run("/chimera/launchctl reboot userspace");
-    
-    LOG(@"done rejailbreak_chimera");sleep(3);
     return 0;
 
 err:
