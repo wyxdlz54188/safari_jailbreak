@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-extern mach_port_t hsp4;
+extern mach_port_t g_hsp4;
 
 #ifndef MIN
 #    define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -19,7 +19,7 @@ kreadbuf(uint64_t kaddr, void *buf, size_t sz) {
 
     while(sz != 0) {
         read_sz = MIN(sz, vm_kernel_page_size - (kaddr & vm_kernel_page_mask));
-        if(mach_vm_read_overwrite(hsp4, kaddr, read_sz, p, &out_sz) != KERN_SUCCESS || out_sz != read_sz) {
+        if(mach_vm_read_overwrite(g_hsp4, kaddr, read_sz, p, &out_sz) != KERN_SUCCESS || out_sz != read_sz) {
             return KERN_FAILURE;
         }
         p += read_sz;
@@ -37,7 +37,7 @@ kwritebuf(uint64_t kaddr, const void *buf, size_t sz) {
 
     while(sz != 0) {
         write_sz = (mach_msg_type_number_t)MIN(sz, vm_kernel_page_size - (kaddr & vm_kernel_page_mask));
-        if(mach_vm_write(hsp4, kaddr, p, write_sz) != KERN_SUCCESS || mach_vm_machine_attribute(hsp4, kaddr, write_sz, MATTR_CACHE, &mattr_val) != KERN_SUCCESS) {
+        if(mach_vm_write(g_hsp4, kaddr, p, write_sz) != KERN_SUCCESS || mach_vm_machine_attribute(g_hsp4, kaddr, write_sz, MATTR_CACHE, &mattr_val) != KERN_SUCCESS) {
             return KERN_FAILURE;
         }
         p += write_sz;
@@ -71,7 +71,7 @@ void kwrite64(uint64_t where, uint64_t what) {
 
 uint64_t kalloc(size_t sz) {
     mach_vm_address_t va = 0;
-    kern_return_t ret = mach_vm_allocate(hsp4, &va, sz, VM_FLAGS_ANYWHERE);
+    kern_return_t ret = mach_vm_allocate(g_hsp4, &va, sz, VM_FLAGS_ANYWHERE);
     if(ret == KERN_SUCCESS) {
         return va;
     }
@@ -79,7 +79,7 @@ uint64_t kalloc(size_t sz) {
 }
 
 void kfree(uint64_t kaddr, size_t sz) {
-    kern_return_t ret = mach_vm_deallocate(hsp4, kaddr, sz);
+    kern_return_t ret = mach_vm_deallocate(g_hsp4, kaddr, sz);
     if(ret == KERN_SUCCESS)
     {
         return;
@@ -91,13 +91,13 @@ void kfree(uint64_t kaddr, size_t sz) {
 void rkbuffer(uint64_t kaddr, void* buffer, uint32_t length) {
     kern_return_t err;
     mach_vm_size_t outsize = 0;
-    err = mach_vm_read_overwrite(hsp4,
+    err = mach_vm_read_overwrite(g_hsp4,
                                  (mach_vm_address_t)kaddr,
                                  (mach_vm_size_t)length,
                                  (mach_vm_address_t)buffer,
                                  &outsize);
     if (err != KERN_SUCCESS){
-      printf("hsp4 read failed %s addr: 0x%llx err:%x port:%x\n", mach_error_string(err), kaddr, err, hsp4);
+      printf("hsp4 read failed %s addr: 0x%llx err:%x port:%x\n", mach_error_string(err), kaddr, err, g_hsp4);
       sleep(3);
       return;
     }
