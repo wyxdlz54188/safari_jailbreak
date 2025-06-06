@@ -6,6 +6,7 @@
 #import "offsets.h"
 #import "csblob.h"
 #import "kutils.h"
+#include "apfs_util.h"
 #import "stage3.h"
 
 int rejailbreak_chimera(void) {
@@ -21,10 +22,12 @@ int rejailbreak_chimera(void) {
     if(getuid() != 0) return 1;
     LOG(@"uid = %d", getuid());
     uint64_t kernelsignpost_addr = write_kernelsignpost();
+    LOG(@"kernelsignpost_addr = 0x%llx", kernelsignpost_addr);
 
+    int snapshot_success = list_snapshots("/");
+    LOG(@"snapshot_success = %d", snapshot_success);
 
     unborrow_cr_label(getpid(), our_cr_label);
-
     LOG(@"done rejailbreak_chimera");
 
     sleep(3);
