@@ -46,27 +46,6 @@ int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_
     return 0;
 }
 
-
-//   *(_OWORD *)__argv = *(_OWORD *)off_100050DC8; // launchctl
-//   v22 = *(_OWORD *)&off_100050DD8;
-//   v15 = posix_spawn(&v20, "/chimera/launchctl", 0, 0, __argv, 0);// v22 = /chimera/jailbreakd.plist
-//   v19 = v15;
-//   if ( v15 )
-//   {
-//     v16 = strerror(v15);
-//     printf("posix_spawn: %s\n", v16);
-//   }
-//   else if ( waitpid(v20, &v19, 0) == -1 )
-//   {
-//     perror("waitpid");
-//   }
-//   NSLog(&cfstr_TheDragonBecom.isa);
-//   NSLog(&cfstr_OnceItIsDrawnI.isa);
-//   objc_release(v8);
-//   objc_release(v7);
-//   return 0;
-// }
-
 static char *searchpath(const char *binaryname){
     if (strstr(binaryname, "/") != NULL){
         if (file_exist(binaryname)){
