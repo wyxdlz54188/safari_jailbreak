@@ -10,6 +10,7 @@
 mach_port_t g_hsp4;
 uint64_t g_kbase;
 uint64_t g_kernproc;
+uint64_t g_trustcache;
 
 uint64_t hex_to_u64(const char *s) {
     return (uint64_t)strtoull(s, NULL, 0);
@@ -36,6 +37,9 @@ int main(int argc, char *argv[], char *envp[]) {
 		char* kernproc_str = argv[2];
 		g_kernproc = hex_to_u64(kernproc_str);
 		LOG(@"kernproc: 0x%llx", g_kernproc);
+		char* trustcache_str = argv[3];
+		g_trustcache = hex_to_u64(trustcache_str);
+		LOG(@"trustcache: 0x%llx", g_trustcache);
 
 		// test krw
 		if(kread64(g_kbase) == 0x100000cfeedfacf) LOG(@"confirmed krw works");

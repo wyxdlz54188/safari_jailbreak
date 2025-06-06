@@ -6,8 +6,9 @@
 #import "offsets.h"
 #import "csblob.h"
 #import "kutils.h"
-#include "remount.h"
+#import "remount.h"
 #import "stage3.h"
+#import "bootstrap.h"
 
 int rejailbreak_chimera(void) {
     offsets_init();
@@ -19,19 +20,24 @@ int rejailbreak_chimera(void) {
     set_ucred_cr_svuid(getpid(), 0);
     setuid(0); setuid(0);
 
-    if(getuid() != 0) goto err;
     LOG(@"uid = %d", getuid());
+    if(getuid() != 0) goto err;
+
     uint64_t kernelsignpost_addr = write_kernelsignpost();
     LOG(@"kernelsignpost_addr = 0x%llx", kernelsignpost_addr);
+    if(kernelsignpost_addr != 0)   goto err;
 
     int snapshot_success = list_snapshots("/");
     LOG(@"snapshot_success = %d", snapshot_success);
     if(snapshot_success != 0)   goto err;
 
-
     int remount_status = remount_root_as_rw();
     LOG(@"remount_status = %d", remount_status);
     if(remount_status != 0)     goto err;
+
+    //TODO: prepare tar, rm, basebinaries.tar, and launchctl
+    extract_bootstrap();
+
 
     LOG(@"done rejailbreak_chimera");sleep(3);
     return 0;
