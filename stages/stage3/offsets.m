@@ -29,6 +29,7 @@ uint32_t off_ubc_info_cs_blobs = 0;
 
 uint32_t off_cs_blob_csb_platform_binary = 0;
 
+uint32_t off_u_cr_svuid = 0;
 uint32_t off_u_cr_label = 0;
 
 
@@ -60,6 +61,7 @@ void offsets_init(void) {
 
         off_cs_blob_csb_platform_binary = 0xa8;
 
+        off_u_cr_svuid = 0x20;
         off_u_cr_label = 0x78;
     }
 }

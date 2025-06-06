@@ -63,3 +63,9 @@ void unborrow_cr_label(pid_t to_pid, uint64_t to_cr_label) {
     
     kwrite64(to_ucred + off_u_cr_label, to_cr_label);
 }
+
+void set_ucred_cr_svuid(pid_t pid, uint64_t val) {
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t ucred = kread64(proc + off_p_ucred);
+    kwrite64(ucred + off_u_cr_svuid, val);
+}

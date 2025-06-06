@@ -21,6 +21,7 @@ extern uint32_t off_ubc_info_cs_blobs;
 
 extern uint32_t off_cs_blob_csb_platform_binary;
 
+extern uint32_t off_u_cr_svuid;
 extern uint32_t off_u_cr_label;
 
 void offsets_init(void);

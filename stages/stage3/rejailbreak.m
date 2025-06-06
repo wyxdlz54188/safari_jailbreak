@@ -15,6 +15,13 @@ int rejailbreak_chimera(void) {
     set_csblob(getpid());
 
     uint64_t our_cr_label = borrow_cr_label(getpid(), 0);
+    set_ucred_cr_svuid(getpid(), 0);
+    setuid(0); setuid(0);
+
+    if(getuid() != 0) return 1;
+    LOG(@"uid = %d", getuid());
+
+
     unborrow_cr_label(getpid(), our_cr_label);
 
     LOG(@"done rejailbreak_chimera");
