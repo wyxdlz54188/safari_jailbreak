@@ -15,6 +15,7 @@ uint32_t off_ipc_port_ip_kobject = 0;
 uint32_t off_p_list_le_prev = 0;
 uint32_t off_p_task = 0;
 uint32_t off_p_pid = 0;
+uint32_t off_p_ucred = 0;
 uint32_t off_p_textvp = 0;
 uint32_t off_p_comm = 0;
 uint32_t off_p_csflags = 0;
@@ -27,6 +28,8 @@ uint32_t off_vnode_vu_ubcinfo = 0;
 uint32_t off_ubc_info_cs_blobs = 0;
 
 uint32_t off_cs_blob_csb_platform_binary = 0;
+
+uint32_t off_u_cr_label = 0;
 
 
 void offsets_init(void) {
@@ -43,6 +46,7 @@ void offsets_init(void) {
         off_p_list_le_prev = 0x8;
         off_p_task = 0x10;
         off_p_pid = 0x60;
+        off_p_ucred = 0xf8;
         off_p_textvp = 0x230;
         off_p_comm = 0x250;
         off_p_csflags = 0x290;
@@ -56,5 +60,6 @@ void offsets_init(void) {
 
         off_cs_blob_csb_platform_binary = 0xa8;
 
+        off_u_cr_label = 0x78;
     }
 }

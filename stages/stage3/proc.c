@@ -8,6 +8,7 @@ extern uint64_t g_kernproc;
 
 uint64_t proc_of_pid(pid_t pid) {
     uint64_t proc = g_kernproc;
+    if(pid == 0) return g_kernproc;
     
     while (true) {
         if(kread32(proc + off_p_pid) == pid) {

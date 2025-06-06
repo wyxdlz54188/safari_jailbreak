@@ -41,3 +41,25 @@ void set_csblob(pid_t pid) {
         }
     }
 }
+
+uint64_t borrow_cr_label(pid_t to_pid, pid_t from_pid) {
+    uint64_t to_proc = proc_of_pid(to_pid);
+    uint64_t from_proc = proc_of_pid(from_pid);
+    
+    uint64_t to_ucred = kread64(to_proc + off_p_ucred);
+    uint64_t from_ucred = kread64(from_proc + off_p_ucred);
+
+    uint64_t to_cr_label = kread64(to_ucred + off_u_cr_label);
+    uint64_t from_cr_label = kread64(from_ucred + off_u_cr_label);
+    
+    kwrite64(to_ucred + off_u_cr_label, from_cr_label);
+    
+    return to_cr_label;
+}
+
+void unborrow_cr_label(pid_t to_pid, uint64_t to_cr_label) {
+    uint64_t to_proc = proc_of_pid(to_pid);
+    uint64_t to_ucred = kread64(to_proc + off_p_ucred);
+    
+    kwrite64(to_ucred + off_u_cr_label, to_cr_label);
+}
