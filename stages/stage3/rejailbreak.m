@@ -5,7 +5,8 @@
 #import "proc.h"
 #import "offsets.h"
 #import "csblob.h"
-#include "kutils.h"
+#import "kutils.h"
+#import "stage3.h"
 
 int rejailbreak_chimera(void) {
     offsets_init();
@@ -13,7 +14,9 @@ int rejailbreak_chimera(void) {
     set_proc_csflags(getpid());
     set_csblob(getpid());
 
-    NSLog(@"[stage3] done rejailbreak_chimera");
+    LOG(@"done rejailbreak_chimera");
+
+    sleep(3);
 
     return 0;
 }

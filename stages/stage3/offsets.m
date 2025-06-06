@@ -1,4 +1,5 @@
 #include "offsets.h"
+#include "stage3.h"
 #include <stdint.h>
 #include <UIKit/UIKit.h>
 #include <Foundation/Foundation.h>
@@ -30,12 +31,12 @@ uint32_t off_cs_blob_csb_platform_binary = 0;
 
 void offsets_init(void) {
     if (!(SYSTEM_VERSION_EQUAL_TO(@"12.5.7"))) {
-        NSLog(@"[stage3] Only supported offset for iOS 12.5.7");
+        LOG(@"Only supported offset for iOS 12.5.7");
         exit(EXIT_FAILURE);
     }
     
     if (SYSTEM_VERSION_EQUAL_TO(@"12.5.7")) {
-        NSLog(@"[stage3] offsets selected for iOS 12.5.7\n");
+        LOG(@"offsets selected for iOS 12.5.7\n");
 
         off_ipc_port_ip_kobject = 0x68;
 
