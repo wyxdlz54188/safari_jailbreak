@@ -10,6 +10,8 @@
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 #define SYSTEM_VERSION_LESS_THAN_OR_EQUAL_TO(v)     ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedDescending)
 
+uint32_t off_ipc_object_io_bits = 0;
+uint32_t off_ipc_port_ip_receiver = 0;
 uint32_t off_ipc_port_ip_kobject = 0;
 
 uint32_t off_p_list_le_prev = 0;
@@ -20,7 +22,10 @@ uint32_t off_p_textvp = 0;
 uint32_t off_p_comm = 0;
 uint32_t off_p_csflags = 0;
 
+uint32_t off_task_itk_space = 0;
 uint32_t off_task_t_flags = 0;
+
+uint32_t off_ipc_space_is_table = 0;
 
 uint32_t off_vnode_v_type = 0;
 uint32_t off_vnode_vu_ubcinfo = 0;
@@ -42,6 +47,8 @@ void offsets_init(void) {
     if (SYSTEM_VERSION_EQUAL_TO(@"12.5.7")) {
         LOG(@"offsets selected for iOS 12.5.7\n");
 
+        off_ipc_object_io_bits = 0x0;
+        off_ipc_port_ip_receiver = 0x60;
         off_ipc_port_ip_kobject = 0x68;
 
         off_p_list_le_prev = 0x8;
@@ -52,7 +59,10 @@ void offsets_init(void) {
         off_p_comm = 0x250;
         off_p_csflags = 0x290;
 
+        off_task_itk_space = 0x300;
         off_task_t_flags = 0x390;
+
+        off_ipc_space_is_table = 0x20;
 
         off_vnode_v_type = 0x70;
         off_vnode_vu_ubcinfo = 0x78;

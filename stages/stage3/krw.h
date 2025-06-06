@@ -30,6 +30,8 @@ void kwrite64(uint64_t where, uint64_t what);
 
 uint64_t kalloc(size_t sz);
 
+uint64_t kalloc_wired(uint64_t size);
+
 void kfree(uint64_t kaddr, size_t sz);
 
 void rkbuffer(uint64_t kaddr, void* buffer, uint32_t length);

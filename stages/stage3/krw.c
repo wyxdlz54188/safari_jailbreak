@@ -1,4 +1,5 @@
 #include "krw.h"
+#include "kutils.h"
 #include <stdint.h>
 #include <mach/mach.h> 
 #include <errno.h>
@@ -76,6 +77,36 @@ uint64_t kalloc(size_t sz) {
         return va;
     }
     return -1;
+}
+
+uint64_t kalloc_wired(uint64_t size) {
+    kern_return_t err;
+    mach_vm_address_t addr = 0;
+    mach_vm_size_t ksize = round_page_kernel(size);
+    
+    printf("vm_kernel_page_size: %lx\n", vm_kernel_page_size);
+    
+    err = mach_vm_allocate(g_hsp4, &addr, ksize+0x4000, VM_FLAGS_ANYWHERE);
+    if (err != KERN_SUCCESS) {
+        printf("unable to allocate kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
+        sleep(3);
+        return 0;
+    }
+    
+    printf("allocated address: %llx\n", addr);
+    
+    addr += 0x3fff;
+    addr &= ~0x3fffull;
+    
+    printf("address to wire: %llx\n", addr);
+    
+    err = mach_vm_wire(fake_host_priv(), g_hsp4, addr, ksize, VM_PROT_READ|VM_PROT_WRITE);
+    if (err != KERN_SUCCESS) {
+        printf("unable to wire kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
+        sleep(3);
+        return 0;
+    }
+    return addr;
 }
 
 void kfree(uint64_t kaddr, size_t sz) {

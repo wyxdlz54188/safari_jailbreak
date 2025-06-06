@@ -20,6 +20,7 @@ int rejailbreak_chimera(void) {
 
     if(getuid() != 0) return 1;
     LOG(@"uid = %d", getuid());
+    uint64_t kernelsignpost_addr = write_kernelsignpost();
 
 
     unborrow_cr_label(getpid(), our_cr_label);

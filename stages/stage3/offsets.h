@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+extern uint32_t off_ipc_object_io_bits;
+extern uint32_t off_ipc_port_ip_receiver;
 extern uint32_t off_ipc_port_ip_kobject;
 
 extern uint32_t off_p_list_le_prev;
@@ -10,7 +12,10 @@ extern uint32_t off_p_textvp;
 extern uint32_t off_p_comm;
 extern uint32_t off_p_csflags;
 
+extern uint32_t off_task_itk_space;
 extern uint32_t off_task_t_flags;
+
+extern uint32_t off_ipc_space_is_table;
 
 extern uint32_t off_vnode_v_type;
 
