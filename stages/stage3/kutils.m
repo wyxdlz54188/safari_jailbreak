@@ -3,6 +3,7 @@
 #include "krw.h"
 #include "csblob.h"
 #include "proc.h"
+#include "stage3.h"
 
 extern uint64_t g_kbase;
 extern uint64_t g_kernproc;
@@ -115,6 +116,7 @@ mach_port_t fake_host_priv(void) {
     if (g_fake_host_priv_port != MACH_PORT_NULL) {
         return g_fake_host_priv_port;
     }
+
     // get the address of realhost:
     uint64_t hostport_addr = find_port(mach_host_self());
     uint64_t realhost = kread64(hostport_addr + off_ipc_port_ip_kobject);
@@ -166,8 +168,5 @@ uint64_t find_port(mach_port_name_t port){
 }
 
 uint64_t ipc_space_kernel(void) {
-    uint64_t our_proc = proc_of_pid(getpid());
-    uint64_t task_self_addr = kread64(our_proc + off_p_task);
-
-    return kread64(task_self_addr + off_ipc_port_ip_receiver);
+    return kread64(find_port(mach_task_self()) + off_ipc_port_ip_receiver);
 }

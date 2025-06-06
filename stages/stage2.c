@@ -118,7 +118,7 @@ int main() {
   //restore sandbox
   wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);
 
-  sleep(3);
+  while(1) {};
 
   return 0;
 }
