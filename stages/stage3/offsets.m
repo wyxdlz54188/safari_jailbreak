@@ -18,15 +18,23 @@ uint32_t off_p_list_le_prev = 0;
 uint32_t off_p_task = 0;
 uint32_t off_p_pid = 0;
 uint32_t off_p_ucred = 0;
+uint32_t off_p_pfd = 0;
 uint32_t off_p_textvp = 0;
 uint32_t off_p_comm = 0;
 uint32_t off_p_csflags = 0;
+
+uint32_t off_fd_ofiles = 0;
+
+uint32_t off_fp_glob = 0;
+
+uint32_t off_fg_data = 0;
 
 uint32_t off_task_itk_space = 0;
 uint32_t off_task_t_flags = 0;
 
 uint32_t off_ipc_space_is_table = 0;
 
+uint32_t off_vnode_v_usecount = 0;
 uint32_t off_vnode_v_type = 0;
 uint32_t off_vnode_vu_ubcinfo = 0;
 uint32_t off_vnode_v_parent = 0;
@@ -59,15 +67,23 @@ void offsets_init(void) {
         off_p_task = 0x10;
         off_p_pid = 0x60;
         off_p_ucred = 0xf8;
+        off_p_pfd = 0x100;
         off_p_textvp = 0x230;
         off_p_comm = 0x250;
         off_p_csflags = 0x290;
+
+        off_fd_ofiles = 0x0;
+
+        off_fp_glob = 0x8;
+
+        off_fg_data = 0x38;
 
         off_task_itk_space = 0x300;
         off_task_t_flags = 0x390;
 
         off_ipc_space_is_table = 0x20;
 
+        off_vnode_v_usecount = 0x60;
         off_vnode_v_type = 0x70;
         off_vnode_vu_ubcinfo = 0x78;
         off_vnode_v_parent = 0xc0;

@@ -217,3 +217,12 @@ int run(const char *cmd) {
     free(rawCmd);
     return status;
 }
+
+char *itoa(long n) {
+    int len = n==0 ? 1 : floor(log10l(labs(n)))+1;
+    if (n<0) len++; // room for negative sign '-'
+    
+    char    *buf = calloc(sizeof(char), len+1); // +1 for null
+    snprintf(buf, len+1, "%ld", n);
+    return   buf;
+}

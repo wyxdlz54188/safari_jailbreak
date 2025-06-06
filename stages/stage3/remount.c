@@ -91,3 +91,20 @@ int remount_root_as_rw(void){
 
     return retval;
 }
+
+uint64_t get_vnode_at_path(char* filename) {
+    int file_index = open(filename, O_RDONLY);
+    if (file_index == -1) return -1;
+    
+    uint64_t proc = proc_of_pid(getpid());
+
+    uint64_t filedesc = kread64(proc + off_p_pfd);
+    uint64_t fileproc = kread64(filedesc + off_fd_ofiles);
+    uint64_t openedfile = kread64(fileproc + (8 * file_index));
+    uint64_t fileglob = kread64(openedfile + off_fp_glob);
+    uint64_t vnode = kread64(fileglob + off_fg_data);
+    
+    close(file_index);
+    
+    return vnode;
+}

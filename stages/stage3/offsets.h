@@ -8,15 +8,23 @@ extern uint32_t off_p_list_le_prev;
 extern uint32_t off_p_task;
 extern uint32_t off_p_pid;
 extern uint32_t off_p_ucred;
+extern uint32_t off_p_pfd;
 extern uint32_t off_p_textvp;
 extern uint32_t off_p_comm;
 extern uint32_t off_p_csflags;
+
+extern uint32_t off_fd_ofiles;
+
+extern uint32_t off_fp_glob;
+
+extern uint32_t off_fg_data;
 
 extern uint32_t off_task_itk_space;
 extern uint32_t off_task_t_flags;
 
 extern uint32_t off_ipc_space_is_table;
 
+extern uint32_t off_vnode_v_usecount;
 extern uint32_t off_vnode_v_type;
 extern uint32_t off_vnode_vu_ubcinfo;
 extern uint32_t off_vnode_v_parent;

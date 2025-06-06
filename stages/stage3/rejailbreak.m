@@ -1,6 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <dlfcn.h>
+#import <spawn.h>
+
 #import "krw.h"
 #import "proc.h"
 #import "offsets.h"
@@ -10,6 +13,9 @@
 #import "stage3.h"
 #import "bootstrap.h"
 #import "start_jailbreakd.h"
+#import "rejailbreak.h"
+
+int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
 
 extern uint64_t g_kbase;
 extern uint64_t g_kernproc;
@@ -45,8 +51,79 @@ int rejailbreak_chimera(void) {
     int jailbreakd_status = start_jailbreakd(g_kbase, g_kernproc, kernelsignpost_addr);
     LOG(@"jailbreakd_status = %d", jailbreakd_status);
     if(jailbreakd_status != 0)     goto err;
+    
+    while (!file_exist("/var/run/jailbreakd.pid"))
+        usleep(100000);
 
+    // jailbreakd_client, getpid(), 1
+    int rv;
+    pid_t pd;
+    const char* args_jailbreakd_client[] = {"jailbreakd_client", itoa(getpid()), "1", NULL};
+    rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client, NULL);
+    waitpid(pd, NULL, 0);
 
+    pid_t our_pid;
+    uint32_t flags;
+    #define DESIRED_FLAGS  (CS_GET_TASK_ALLOW | CS_PLATFORM_BINARY | CS_DEBUGGED)
+    while (true)
+    {
+      our_pid = getpid();
+      csops(our_pid, 0, &flags, 0);
+      if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
+        break;
+      usleep(100000);
+    }
+
+    // jailbreakd_client, launchd
+    const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", NULL};
+    rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client_2, NULL);
+    waitpid(pd, NULL, 0);
+
+    pid_t launchd_pid;
+    while (true)
+    {
+      launchd_pid = 1;
+      csops(launchd_pid, 0, &flags, 0);
+      if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
+        break;
+      usleep(100000);
+    }
+
+    // inject_criticald, 1, /chimera/pspawn_payload.dylib
+    const char* args_inject_criticald[] = {"inject_criticald", "1", "/chimera/pspawn_payload.dylib", NULL};
+    rv = posix_spawn(&pd, "/chimera/inject_criticald", NULL, NULL, (char **)&args_inject_criticald, NULL);
+    waitpid(pd, NULL, 0);
+
+    dlopen("/usr/lib/pspawn_payload-stg2.dylib", RTLD_NOW);
+
+    //maybe_setup_smth()    //SKIP for now...
+
+    update_springboard_plist();
+
+    pid_t cfprefsd_pid = pid_by_name("cfprefsd");
+    kill(cfprefsd_pid, 9);
+
+    uint64_t launchd_vnode = get_vnode_at_path("/sbin/launchd");
+    uint32_t launchd_v_use_count = kread32(launchd_vnode + off_vnode_v_usecount);
+    kwrite32(launchd_vnode + off_vnode_v_usecount, launchd_v_use_count + 1);
+
+    uint64_t xpcproxy_vnode = get_vnode_at_path("/usr/libexec/xpcproxy");
+    uint32_t xpcproxy_v_use_count = kread32(xpcproxy_vnode + off_vnode_v_usecount);
+    kwrite32(xpcproxy_vnode + off_vnode_v_usecount, xpcproxy_v_use_count + 1);
+
+    bool is_enabled_tweak = true;   // at this moment, always enabled now.
+    if(is_enabled_tweak) {
+        unlink("/.disable_tweakinject");
+        startDaemons();
+        usleep(100000u);
+    } else {
+        int disable_tweakinject_fd = open("/.disable_tweakinject", O_RDWR | O_CREAT);
+        close(disable_tweakinject_fd);
+    }
+
+    unborrow_cr_label(getpid(), our_cr_label);
+    run("/chimera/launchctl reboot userspace");
+    
     LOG(@"done rejailbreak_chimera");sleep(3);
     return 0;
 
@@ -55,4 +132,32 @@ err:
     LOG(@"failed rejailbreak_chimera");sleep(3);
 
     return 1;
+}
+
+void update_springboard_plist(void){
+    NSDictionary *springBoardPlist = [NSMutableDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.apple.springboard.plist"];
+    [springBoardPlist setValue:@YES forKey:@"SBShowNonDefaultSystemApps"];
+    [springBoardPlist writeToFile:@"/var/mobile/Library/Preferences/com.apple.springboard.plist" atomically:YES];
+    
+    NSDictionary* attr = [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithShort:0755], NSFilePosixPermissions,@"mobile",NSFileOwnerAccountName,NULL];
+    
+    NSError *error = nil;
+    [[NSFileManager defaultManager] setAttributes:attr ofItemAtPath:@"/var/mobile/Library/Preferences/com.apple.springboard.plist" error:&error];
+}
+
+void startDaemons(){    
+    pid_t pd;
+    
+    NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:@"/Library/LaunchDaemons/" error:nil];
+    for (NSString *fileName in files){
+        if ([fileName isEqualToString:@"jailbreakd.plist"])
+            continue;
+        if ([fileName isEqualToString:@"com.openssh.sshd.plist"])
+            continue;
+        
+        NSString *fullPath = [@"/Library/LaunchDaemons" stringByAppendingPathComponent:fileName];
+        
+        posix_spawn(&pd, "/bin/launchctl", NULL, NULL, (char **)&(const char*[]){ "launchctl", "load", [fullPath UTF8String], NULL }, NULL);
+        waitpid(pd, NULL, 0);
+    }
 }
