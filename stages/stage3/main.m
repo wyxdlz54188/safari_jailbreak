@@ -8,6 +8,7 @@
 
 mach_port_t hsp4;
 uint64_t kbase;
+uint64_t kernproc;
 
 uint64_t hex_to_u64(const char *s) {
     return (uint64_t)strtoull(s, NULL, 0);
@@ -27,10 +28,15 @@ int main(int argc, char *argv[], char *envp[]) {
 		int fd = open("/tmp/stage3_got_hsp4", O_CREAT | O_WRONLY, 0644);
     	if (fd >= 0) close(fd);
 
-		// test krw
+		// save global kernel info
 		char* kbase_str = argv[1];
 		kbase = hex_to_u64(kbase_str);
 		NSLog(@"[stage3] kbase: 0x%llx", kbase);
+		char* kernproc_str = argv[2];
+		kernproc = hex_to_u64(kernproc_str);
+		NSLog(@"[stage3] kernproc: 0x%llx", kernproc);
+
+		// test krw
 		if(kread64(kbase) == 0x100000cfeedfacf) NSLog(@"[stage3] confirmed krw works");
 #endif
 		NSString *msg = [NSString stringWithFormat:@"hsp4: 0x%x, kbase: %s", hsp4, argv[1]];
