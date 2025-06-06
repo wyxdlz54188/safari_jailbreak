@@ -1,4 +1,7 @@
 #include "remount.h"
+#include "offsets.h"
+#include "krw.h"
+#include "proc.h"
 
 #include <fcntl.h>
 #include <sys/syscall.h>
@@ -10,6 +13,7 @@
 #include <sys/attr.h>
 #include <sys/snapshot.h>
 #include <mach/mach.h>
+#include <sys/mount.h>
 
 int list_snapshots(const char *vol)
 {
@@ -52,4 +56,38 @@ int list_snapshots(const char *vol)
     }
     
     return (0);
+}
+
+uint64_t find_rootvnode(void) {
+    uint64_t launchd_proc = proc_of_pid(1);
+
+    uint64_t textvp = kread64(launchd_proc + off_p_textvp);
+    
+    uint64_t sbin_vnode = kread64(textvp + off_vnode_v_parent);
+    
+    uint64_t root_vnode = kread64(sbin_vnode + off_vnode_v_parent);
+    
+    return root_vnode;
+}
+
+#define MNT_RDONLY      0x00000001      /* read only filesystem */
+#define MNT_NOSUID      0x00000008      /* don't honor setuid bits on fs */
+#define MNT_ROOTFS      0x00004000      /* identifies the root filesystem */
+#define MNT_UPDATE      0x00010000      /* not a real mount, just an update */
+
+int remount_root_as_rw(void){
+    uint64_t rootvnode = find_rootvnode();
+    uint64_t vmount = kread64(rootvnode + off_vnode_v_mount);
+    uint32_t vflag = kread32(vmount + off_mount_mnt_flag);
+    
+    uint32_t updated_vflag = vflag & ~(MNT_RDONLY);
+    kwrite32(vmount + off_mount_mnt_flag, updated_vflag & ~(MNT_ROOTFS));
+
+    char* dev_path = strdup("/dev/disk0s1s1");
+    int retval = mount("apfs", "/", MNT_UPDATE, &dev_path);
+    free(dev_path);
+
+    kwrite32(vmount + off_mount_mnt_flag, updated_vflag);
+
+    return retval;
 }

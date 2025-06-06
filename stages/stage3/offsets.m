@@ -29,6 +29,10 @@ uint32_t off_ipc_space_is_table = 0;
 
 uint32_t off_vnode_v_type = 0;
 uint32_t off_vnode_vu_ubcinfo = 0;
+uint32_t off_vnode_v_parent = 0;
+uint32_t off_vnode_v_mount = 0;
+
+uint32_t off_mount_mnt_flag = 0;
 
 uint32_t off_ubc_info_cs_blobs = 0;
 
@@ -66,6 +70,10 @@ void offsets_init(void) {
 
         off_vnode_v_type = 0x70;
         off_vnode_vu_ubcinfo = 0x78;
+        off_vnode_v_parent = 0xc0;
+        off_vnode_v_mount = 0xd8;
+
+        off_mount_mnt_flag = 0x70;
 
         off_ubc_info_cs_blobs = 0x50;
 

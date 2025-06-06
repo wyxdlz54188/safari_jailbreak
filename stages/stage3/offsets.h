@@ -18,9 +18,11 @@ extern uint32_t off_task_t_flags;
 extern uint32_t off_ipc_space_is_table;
 
 extern uint32_t off_vnode_v_type;
-
-extern uint32_t off_vnode_v_type;
 extern uint32_t off_vnode_vu_ubcinfo;
+extern uint32_t off_vnode_v_parent;
+extern uint32_t off_vnode_v_mount;
+
+extern uint32_t off_mount_mnt_flag;
 
 extern uint32_t off_ubc_info_cs_blobs;
 
