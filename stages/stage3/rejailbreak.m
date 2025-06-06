@@ -35,7 +35,7 @@ int rejailbreak_chimera(void) {
 
     uint64_t kernelsignpost_addr = write_kernelsignpost();
     LOG(@"kernelsignpost_addr = 0x%llx", kernelsignpost_addr);
-    if(kernelsignpost_addr != 0)   goto err;
+    if(kernelsignpost_addr == 0)   goto err;
 
     int snapshot_success = list_snapshots("/");
     LOG(@"snapshot_success = %d", snapshot_success);
