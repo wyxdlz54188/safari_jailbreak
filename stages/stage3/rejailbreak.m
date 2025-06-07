@@ -15,13 +15,18 @@
 #import "start_jailbreakd.h"
 #import "rejailbreak.h"
 #import "amfi_utils.h"
+#import "inject.h"
 
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
 
 extern uint64_t g_kbase;
 extern uint64_t g_kernproc;
 
+extern uint64_t g_trustcache;
+
 extern uint64_t g_jbd_pid;
+
+NSMutableArray<NSString *> *files = nil;
 
 int rejailbreak_chimera(void) {
     offsets_init();
@@ -49,19 +54,29 @@ int rejailbreak_chimera(void) {
     if(remount_status != 0)     goto err;
 
     // extract_bootstrap(); // we don't need it for rejailbreak.
-    inject_trusts(6, (const char **)&(const char*[]){
-        "/chimera/inject_criticald",
-        "/chimera/pspawn_payload.dylib",
-        "/chimera/pspawn_payload-stg2.dylib",
-        "/chimera/jailbreakd",
-        "/chimera/jailbreakd_client",
-        "/chimera/launchctl"
-    });
+    // inject_trusts(6, (const char **)&(const char*[]){
+    //     "/chimera/inject_criticald",
+    //     "/chimera/pspawn_payload.dylib",
+    //     "/chimera/pspawn_payload-stg2.dylib",
+    //     "/chimera/jailbreakd",
+    //     "/chimera/jailbreakd_client",
+    //     "/chimera/launchctl"
+    // });
+    files = @[
+        @"/chimera/inject_criticald",
+        @"/chimera/pspawn_payload.dylib",
+        @"/chimera/pspawn_payload-stg2.dylib",
+        @"/chimera/jailbreakd",
+        @"/chimera/jailbreakd_client",
+        @"/chimera/launchctl"
+    ];
+    injectTrustCache(files, g_trustcache);
 
     int jailbreakd_status = start_jailbreakd(g_kbase, g_kernproc, kernelsignpost_addr);
     LOG(@"jailbreakd_status = %d", jailbreakd_status);
     if(jailbreakd_status != 0)     goto err;
     
+    sleep(2);
     log_launchctl_list();
 
     while (!file_exist("/var/run/jailbreakd.pid"))

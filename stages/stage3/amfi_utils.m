@@ -24,26 +24,26 @@
 
 extern uint64_t g_trustcache;
 
-uint32_t swap_uint32( uint32_t val ) {
+static uint32_t swap_uint32( uint32_t val ) {
     val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF );
     return (val << 16) | (val >> 16);
 }
 
-uint32_t read_magic(FILE* file, off_t offset) {
+static uint32_t read_magic(FILE* file, off_t offset) {
     uint32_t magic;
     fseek(file, offset, SEEK_SET);
     fread(&magic, sizeof(uint32_t), 1, file);
     return magic;
 }
 
-void *load_bytes(FILE *file, off_t offset, size_t size) {
+static void *load_bytes(FILE *file, off_t offset, size_t size) {
     void *buf = calloc(1, size);
     fseek(file, offset, SEEK_SET);
     fread(buf, size, 1, file);
     return buf;
 }
 
-void getSHA256inplace(const uint8_t* code_dir, uint8_t *out) {
+static void getSHA256inplace(const uint8_t* code_dir, uint8_t *out) {
     if (code_dir == NULL) {
         printf("NULL passed to getSHA256inplace!\n");
         return;
@@ -61,13 +61,13 @@ void getSHA256inplace(const uint8_t* code_dir, uint8_t *out) {
     CC_SHA256(code_dir, realsize, out);
 }
 
-uint8_t *getSHA256(const uint8_t* code_dir) {
+static uint8_t *getSHA256(const uint8_t* code_dir) {
     uint8_t *out = malloc(CC_SHA256_DIGEST_LENGTH);
     getSHA256inplace(code_dir, out);
     return out;
 }
 
-uint8_t *getCodeDirectory(const char* name) {
+static uint8_t *getCodeDirectory(const char* name) {
     
     FILE* fd = fopen(name, "r");
     
@@ -155,17 +155,11 @@ uint8_t *getCodeDirectory(const char* name) {
 }
 
 void inject_trusts(int pathc, const char *paths[]) {
-    printf("Injecting into trust cache...\n");
-    
-    static uint64_t tc = 0;
-    if (tc == 0) tc = g_trustcache;
-    
-    printf("Trust cache: 0x%llx\n", tc);
+    uint64_t trust_chain = g_trustcache;
     
     struct trust_chain fake_chain;
-    fake_chain.next = kread64(tc);
-    *(uint64_t *)&fake_chain.uuid[0] = 0xabadbabeabadbabe;
-    *(uint64_t *)&fake_chain.uuid[8] = 0xabadbabeabadbabe;
+    fake_chain.next = kread64(trust_chain);
+    arc4random_buf(fake_chain.uuid, 16);
     
     int cnt = 0;
     uint8_t hash[CC_SHA256_DIGEST_LENGTH];
@@ -181,15 +175,16 @@ void inject_trusts(int pathc, const char *paths[]) {
     
     fake_chain.count = cnt;
     
-    size_t length = (sizeof(fake_chain) + cnt * sizeof(hash_t) + 0xFFFF) & ~0xFFFF;
-    uint64_t kernel_trust = kalloc(length);
-    
-    printf("Writing fake_chain\n");
+    size_t length = (sizeof(fake_chain) + cnt * sizeof(hash_t) + 0x3FFF) & ~0x3FFF;
+    uint64_t kernel_trust = kalloc_wired(length);
+
+
+    // printf("Writing fake_chain\n");
     kwritebuf(kernel_trust, &fake_chain, sizeof(fake_chain));
-    printf("allhash\n");
+    // printf("allhash\n");
     kwritebuf(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
-    printf("Writing trust cache\n");
-    kwrite64(tc, kernel_trust);
+    // printf("Writing trust cache\n");
+    kwrite64(trust_chain, kernel_trust);
     
-    printf("Injected trust cache\n");
+    // printf("Injected trust cache\n");
 }
