@@ -14,11 +14,14 @@
 #import "bootstrap.h"
 #import "start_jailbreakd.h"
 #import "rejailbreak.h"
+#import "amfi_utils.h"
 
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
 
 extern uint64_t g_kbase;
 extern uint64_t g_kernproc;
+
+extern uint64_t g_jbd_pid;
 
 int rejailbreak_chimera(void) {
     offsets_init();
@@ -45,13 +48,22 @@ int rejailbreak_chimera(void) {
     LOG(@"remount_status = %d", remount_status);
     if(remount_status != 0)     goto err;
 
-    //TODO: prepare tar, rm, basebinaries.tar, and launchctl
-    extract_bootstrap();
+    // extract_bootstrap(); // we don't need it for rejailbreak.
+    inject_trusts(6, (const char **)&(const char*[]){
+        "/chimera/inject_criticald",
+        "/chimera/pspawn_payload.dylib",
+        "/chimera/pspawn_payload-stg2.dylib",
+        "/chimera/jailbreakd",
+        "/chimera/jailbreakd_client",
+        "/chimera/launchctl"
+    });
 
     int jailbreakd_status = start_jailbreakd(g_kbase, g_kernproc, kernelsignpost_addr);
     LOG(@"jailbreakd_status = %d", jailbreakd_status);
     if(jailbreakd_status != 0)     goto err;
     
+    log_launchctl_list();
+
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
 
@@ -75,7 +87,7 @@ int rejailbreak_chimera(void) {
     }
     LOG(@"jailbreakd_client called success 1");
 
-    // jailbreakd_client, launchd
+    // jailbreakd_client, launchd_pid
     const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", NULL};
     rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client_2, NULL);
     waitpid(pd, NULL, 0);
@@ -99,10 +111,8 @@ int rejailbreak_chimera(void) {
 
     dlopen("/usr/lib/pspawn_payload-stg2.dylib", RTLD_NOW);
 
-    //maybe_setup_smth()    //SKIP for now...
-
     update_springboard_plist();
-    LOG(@"update_springboard_plist called");
+    LOG(@"update_springboard_plist done");
 
     pid_t cfprefsd_pid = pid_by_name("cfprefsd");
     kill(cfprefsd_pid, 9);
@@ -165,4 +175,43 @@ void startDaemons(){
         posix_spawn(&pd, "/bin/launchctl", NULL, NULL, (char **)&(const char*[]){ "launchctl", "load", [fullPath UTF8String], NULL }, NULL);
         waitpid(pd, NULL, 0);
     }
+}
+
+int log_launchctl_list(void) {
+    pid_t pid;
+    int status;
+
+    int fd = open("/var/launchctl_log.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        LOG(@"open");
+        return 1;
+    }
+
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+    posix_spawn_file_actions_adddup2(&file_actions, fd, STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&file_actions, fd, STDERR_FILENO);
+
+    char *argv[] = {"/chimera/launchctl", "list", NULL};
+
+    int ret = posix_spawn(&pid, argv[0], &file_actions, NULL, argv, NULL);
+    if (ret != 0) {
+        LOG(@"posix_spawn ret: %d", ret);
+        close(fd);
+        return 1;
+    }
+    LOG(@"posix_spawn ret: %d", ret);
+
+    waitpid(pid, &status, 0);
+
+    posix_spawn_file_actions_destroy(&file_actions);
+    close(fd);
+
+    if (WIFEXITED(status)) {
+        LOG(@"launchctl list exited with status %d\n", WEXITSTATUS(status));
+    } else {
+        LOG(@"launchctl list did not exit normally\n");
+    }
+
+    return 0;
 }

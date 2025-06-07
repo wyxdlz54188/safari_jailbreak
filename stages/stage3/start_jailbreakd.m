@@ -1,5 +1,6 @@
 #include "bootstrap.h"
 #include "start_jailbreakd.h"
+#include "stage3.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <sys/stat.h>
 
 #define PROC_PIDPATHINFO_MAXSIZE (4*MAXPATHLEN)
+uint64_t g_jbd_pid;
 
 int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_addr) {
     unlink("/var/tmp/jailbreakd.pid");
@@ -23,7 +25,9 @@ int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_
     mkdir("/Library/LaunchDaemons", 0755);
     chown("/Library/LaunchDaemons", 0, 0);
 
-    NSData *blob = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"jailbreakd" ofType:@"plist"]];
+    LOG(@"file_exist  /chimera/jailbreakd.plist: %d", file_exist("/chimera/jailbreakd.plist"));
+
+    NSData *blob = [NSData dataWithContentsOfFile:@"/chimera/jailbreakd.plist"];
     NSMutableDictionary *job = [NSPropertyListSerialization propertyListWithData:blob options:NSPropertyListMutableContainers format:nil error:nil];
 
     job[@"EnvironmentVariables"][@"KernelBase"] = [NSString stringWithFormat:@"0x%16llx", kbase];
@@ -36,13 +40,19 @@ int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_
     chown("/chimera/jailbreakd.plist", 0, 0);
     unlink("/Library/LaunchDaemons/jailbreakd.plist");
 
-    pid_t pid = 0;
-    int rv = run("/chimera/launchctl load /chimera/jailbreakd.plist");
-    if (rv == -1) {
-        return -1;
+    pid_t pid;
+    char *argv[] = {"launchctl", "load", "/chimera/jailbreakd.plist", NULL};
+    int status = posix_spawn(&pid, "/chimera/launchctl", NULL, NULL, argv, NULL);
+    g_jbd_pid = pid;
+    if (status == 0) {
+        LOG(@"posix_spawned pid: %d\n", pid);
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid");
+        }
+    } else {
+        LOG(@"posix_spawn: %s\n", strerror(status));
     }
-    int ex = 0;
-    waitpid(pid, &ex, 0);
+
     return 0;
 }
 

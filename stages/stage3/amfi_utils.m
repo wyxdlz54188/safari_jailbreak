@@ -8,20 +8,39 @@
 
 #include "amfi_utils.h"
 #include "krw.h"
-
 #include "kutils.h"
+#include "stage3.h"
+
+
 #include <stdlib.h>
 #include <mach-o/loader.h>
 #include <CommonCrypto/CommonDigest.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <mach-o/fat.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 extern uint64_t g_trustcache;
 
 uint32_t swap_uint32( uint32_t val ) {
     val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF );
     return (val << 16) | (val >> 16);
+}
+
+uint32_t read_magic(FILE* file, off_t offset) {
+    uint32_t magic;
+    fseek(file, offset, SEEK_SET);
+    fread(&magic, sizeof(uint32_t), 1, file);
+    return magic;
+}
+
+void *load_bytes(FILE *file, off_t offset, size_t size) {
+    void *buf = calloc(1, size);
+    fseek(file, offset, SEEK_SET);
+    fread(buf, size, 1, file);
+    return buf;
 }
 
 void getSHA256inplace(const uint8_t* code_dir, uint8_t *out) {
@@ -49,7 +68,6 @@ uint8_t *getSHA256(const uint8_t* code_dir) {
 }
 
 uint8_t *getCodeDirectory(const char* name) {
-    // Assuming it is a macho
     
     FILE* fd = fopen(name, "r");
     
@@ -57,21 +75,59 @@ uint8_t *getCodeDirectory(const char* name) {
     fread(&magic, sizeof(magic), 1, fd);
     fseek(fd, 0, SEEK_SET);
     
-    long off;
-    int ncmds;
+    long off = 0, file_off = 0;
+    int ncmds = 0;
+    BOOL foundarm64 = false;
     
-    if (magic == MH_MAGIC_64) {
+    if (magic == MH_MAGIC_64) { // 0xFEEDFACF
         struct mach_header_64 mh64;
         fread(&mh64, sizeof(mh64), 1, fd);
         off = sizeof(mh64);
         ncmds = mh64.ncmds;
-    } else if (magic == MH_MAGIC) {
-        struct mach_header mh;
-        fread(&mh, sizeof(mh), 1, fd);
-        off = sizeof(mh);
-        ncmds = mh.ncmds;
-    } else {
-        printf("%s is not a macho! (or has foreign endianness?) (magic: %x)\n", name, magic);
+    }
+    else if (magic == MH_MAGIC) {
+        printf("[-] %s is 32bit. What are you doing here?\n", name);
+        fclose(fd);
+        return NULL;
+    }
+    else if (magic == 0xBEBAFECA) { //FAT binary magic
+        
+        size_t header_size = sizeof(struct fat_header);
+        size_t arch_size = sizeof(struct fat_arch);
+        size_t arch_off = header_size;
+        
+        struct fat_header *fat = (struct fat_header*)load_bytes(fd, 0, header_size);
+        struct fat_arch *arch = (struct fat_arch *)load_bytes(fd, arch_off, arch_size);
+        
+        int n = swap_uint32(fat->nfat_arch);
+        printf("[*] Binary is FAT with %d architectures\n", n);
+        
+        while (n-- > 0) {
+            magic = read_magic(fd, swap_uint32(arch->offset));
+            
+            if (magic == 0xFEEDFACF) {
+                printf("[*] Found arm64\n");
+                foundarm64 = true;
+                struct mach_header_64* mh64 = (struct mach_header_64*)load_bytes(fd, swap_uint32(arch->offset), sizeof(struct mach_header_64));
+                file_off = swap_uint32(arch->offset);
+                off = swap_uint32(arch->offset) + sizeof(struct mach_header_64);
+                ncmds = mh64->ncmds;
+                break;
+            }
+            
+            arch_off += arch_size;
+            arch = load_bytes(fd, arch_off, arch_size);
+        }
+        
+        if (!foundarm64) { // by the end of the day there's no arm64 found
+            printf("[-] No arm64? RIP\n");
+            fclose(fd);
+            return NULL;
+        }
+    }
+    else {
+        printf("[-] %s is not a macho! (or has foreign endianness?) (magic: %x)\n", name, magic);
+        fclose(fd);
         return NULL;
     }
     
@@ -86,13 +142,15 @@ uint8_t *getCodeDirectory(const char* name) {
             fread(&size_cs, sizeof(uint32_t), 1, fd);
             
             uint8_t *cd = malloc(size_cs);
-            fseek(fd, off_cs, SEEK_SET);
+            fseek(fd, off_cs + file_off, SEEK_SET);
             fread(cd, size_cs, 1, fd);
+            fclose(fd);
             return cd;
         } else {
             off += cmd.cmdsize;
         }
     }
+    fclose(fd);
     return NULL;
 }
 

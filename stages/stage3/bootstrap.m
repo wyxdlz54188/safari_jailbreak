@@ -1,6 +1,7 @@
 #include "bootstrap.h"
 #include "NSData+GZip.h"
 #include "amfi_utils.h"
+#include "stage3.h"
 
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -8,15 +9,23 @@
 #include <mach-o/dyld.h>
 #include <copyfile.h>
 #include <spawn.h>
+#include <unistd.h>
+#include <sys/errno.h>
 
+#define PREPARE_BOOTSTRAP 0
+
+// we don't need bootstrap for rejailbreak
+#if PREPARE_BOOTSTRAP
 #include "chimera/basebinaries_tar.h"
 #include "chimera/launchctl_gz.h"
 #include "chimera/rm_gz.h"
 #include "chimera/tar_gz.h"
+#include "chimera/jailbreakd_arm64.h"
+#endif
 
 #define cp(to, from) copyfile(from, to, 0, COPYFILE_ALL)
 
-void extract_file(const char *path, const unsigned char *data, size_t size) {
+void write_file(const char *path, const unsigned char *data, size_t size) {
     FILE *f = fopen(path, "wb");
     if (f) {
         fwrite(data, 1, size, f);
@@ -24,24 +33,41 @@ void extract_file(const char *path, const unsigned char *data, size_t size) {
     }
 }
 
-void prepare_bootstrap() {
-    unlink("/tmp/rm_gz");
-    unlink("/tmp/basebinaries_tar");
-    unlink("/tmp/tar_gz");
-    unlink("/tmp/launchctl_gz");
+int prepare_bootstrap() {
+#if PREPARE_BOOTSTRAP
+    unlink("/tmp/rm.gz");
+    unlink("/tmp/basebinaries.tar");
+    unlink("/tmp/tar.gz");
+    unlink("/tmp/launchctl.gz");
 
-    extract_file("/tmp/rm_gz", rm_gz, sizeof(rm_gz));
-    extract_file("/tmp/basebinaries_tar", basebinaries_tar, sizeof(basebinaries_tar));
-    extract_file("/tmp/tar_gz", tar_gz, sizeof(tar_gz));
-    extract_file("/tmp/launchctl_gz", launchctl_gz, sizeof(launchctl_gz));
+    write_file("/tmp/rm.gz", rm_gz, sizeof(rm_gz));
+    write_file("/tmp/basebinaries.tar", basebinaries_tar, sizeof(basebinaries_tar));
+    write_file("/tmp/tar.gz", tar_gz, sizeof(tar_gz));
+    write_file("/tmp/launchctl.gz", launchctl_gz, sizeof(launchctl_gz));
+
+    chmod("/tmp/rm.gz", 0777);
+    chmod("/tmp/basebinaries.tar", 0777);
+    chmod("/tmp/tar.gz", 0777);
+    chmod("/tmp/launchctl.gz", 0777);
+
+    if(!file_exist("/tmp/rm.gz"))   return 1;
+    if(!file_exist("/tmp/basebinaries.tar"))   return 2;
+    if(!file_exist("/tmp/tar.gz"))   return 3;
+    if(!file_exist("/tmp/launchctl.gz"))   return 4;
+#endif
+    return 0;
 }
+
 
 void extract_bootstrap() {
     //we need tar, rm, basebinaries.tar, and launchctl
-    prepare_bootstrap();
+    //we don't need actually this function for rejailbreak, but leave here.
+
+    int status = prepare_bootstrap();
+    LOG(@"prepare_bootstrap ret = %d", status);
 
     mkdir("/chimera", 0755);
-    extractGz("/tmp/tar", "/chimera/tar");
+    extractGz("/tmp/tar.gz", "/chimera/tar");
     chmod("/chimera/tar", 0755);
     inject_trusts(1, (const char **)&(const char*[]){"/chimera/tar"});
 
@@ -49,14 +75,15 @@ void extract_bootstrap() {
     unlink("/chimera/jailbreakd_client");
     unlink("/chimera/pspawn_payload.dylib");
 
-    extractGz("/tmp/rm", "/chimera/rm");
+    extractGz("/tmp/rm.gz", "/chimera/rm");
     chmod("/chimera/rm", 0755);
 
     pid_t pd;
-    posix_spawn(&pd, "/chimera/tar", NULL, NULL, (char **)&(const char*[]){ "/chimera/tar", "-xpf", progname("/tmp/basebinaries.tar"), "-C", "/chimera", NULL }, NULL);
+    posix_spawn(&pd, "/chimera/tar", NULL, NULL, (char **)&(const char*[]){ "/chimera/tar", "-xpf", "/tmp/basebinaries.tar", "-C", "/chimera", NULL }, NULL);
     waitpid(pd, NULL, 0);
+
     unlink("/chimera/launchctl");
-    extractGz("/tmp/launchctl", "/chimera/launchctl");
+    extractGz("/tmp/launchctl.gz", "/chimera/launchctl");
     chmod("/chimera/launchctl", 0755);
 
     if (!file_exist("/bin/launchctl"))
@@ -79,7 +106,7 @@ void extract_bootstrap() {
 }
 
 void extractGz(const char *from, const char *to) {
-    NSData *gz = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@(from) ofType:@"gz"]];
+    NSData *gz = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:from]];
     NSData *extracted = [gz gunzippedData];
     int fd = open(to, O_CREAT | O_WRONLY, 0755);
     write(fd, [extracted bytes], [extracted length]);
