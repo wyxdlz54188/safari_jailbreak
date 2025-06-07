@@ -54,14 +54,6 @@ int rejailbreak_chimera(void) {
     if(remount_status != 0)     goto err;
 
     // extract_bootstrap(); // we don't need it for rejailbreak.
-    // inject_trusts(6, (const char **)&(const char*[]){
-    //     "/chimera/inject_criticald",
-    //     "/chimera/pspawn_payload.dylib",
-    //     "/chimera/pspawn_payload-stg2.dylib",
-    //     "/chimera/jailbreakd",
-    //     "/chimera/jailbreakd_client",
-    //     "/chimera/launchctl"
-    // });
     files = @[
         @"/chimera/inject_criticald",
         @"/chimera/pspawn_payload.dylib",
@@ -72,15 +64,16 @@ int rejailbreak_chimera(void) {
     ];
     injectTrustCache(files, g_trustcache);
 
-    int jailbreakd_status = start_jailbreakd(g_kbase, g_kernproc, kernelsignpost_addr);
-    LOG(@"jailbreakd_status = %d", jailbreakd_status);
-    if(jailbreakd_status != 0)     goto err;
+    int jailbreakd_status = start_jailbreakd(g_kbase, get_allproc(), kernelsignpost_addr);
+    // LOG(@"jailbreakd_status = %d", jailbreakd_status);
+    // if(jailbreakd_status != 0)     goto err;
     
-    sleep(2);
-    log_launchctl_list();
+    // sleep(2);
+    // log_launchctl_list();
 
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
+    LOG(@"start_jailbreakd success");
 
     // jailbreakd_client, getpid(), 1
     int rv;
@@ -103,7 +96,7 @@ int rejailbreak_chimera(void) {
     LOG(@"jailbreakd_client called success 1");
 
     // jailbreakd_client, launchd_pid
-    const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", NULL};
+    const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", "1", NULL};
     rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client_2, NULL);
     waitpid(pd, NULL, 0);
 
@@ -148,7 +141,7 @@ int rejailbreak_chimera(void) {
         LOG(@"done rejailbreak_chimera, userspace rebooting now!");
         usleep(100000u);
         unborrow_cr_label(getpid(), our_cr_label);
-        run("/chimera/launchctl reboot userspace");
+        run_userspace_reboot();
     } else {
         int disable_tweakinject_fd = open("/.disable_tweakinject", O_RDWR | O_CREAT);
         close(disable_tweakinject_fd);
@@ -192,41 +185,17 @@ void startDaemons(){
     }
 }
 
-int log_launchctl_list(void) {
+int run_userspace_reboot(void) {
     pid_t pid;
-    int status;
-
-    int fd = open("/var/launchctl_log.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1) {
-        LOG(@"open");
-        return 1;
-    }
-
-    posix_spawn_file_actions_t file_actions;
-    posix_spawn_file_actions_init(&file_actions);
-    posix_spawn_file_actions_adddup2(&file_actions, fd, STDOUT_FILENO);
-    posix_spawn_file_actions_adddup2(&file_actions, fd, STDERR_FILENO);
-
-    char *argv[] = {"/chimera/launchctl", "list", NULL};
-
-    int ret = posix_spawn(&pid, argv[0], &file_actions, NULL, argv, NULL);
-    if (ret != 0) {
-        LOG(@"posix_spawn ret: %d", ret);
-        close(fd);
-        return 1;
-    }
-    LOG(@"posix_spawn ret: %d", ret);
-
-    waitpid(pid, &status, 0);
-
-    posix_spawn_file_actions_destroy(&file_actions);
-    close(fd);
-
-    if (WIFEXITED(status)) {
-        LOG(@"launchctl list exited with status %d\n", WEXITSTATUS(status));
+    char *argv[] = {"launchctl", "reboot", "userspace", NULL};
+    int status = posix_spawn(&pid, "/chimera/launchctl", NULL, NULL, argv, NULL);
+    g_jbd_pid = pid;
+    if (status == 0) {
+        LOG(@"posix_spawned pid: %d\n", pid);
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid");
+        }
     } else {
-        LOG(@"launchctl list did not exit normally\n");
+        LOG(@"posix_spawn: %s\n", strerror(status));
     }
-
-    return 0;
 }

@@ -1,6 +1,7 @@
 #include "bootstrap.h"
 #include "start_jailbreakd.h"
 #include "stage3.h"
+#include "proc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +11,7 @@
 #define PROC_PIDPATHINFO_MAXSIZE (4*MAXPATHLEN)
 uint64_t g_jbd_pid;
 
-int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_addr) {
+int start_jailbreakd(uint64_t kbase, uint64_t allproc, uint64_t kernelsignpost_addr) {
     unlink("/var/tmp/jailbreakd.pid");
     unlink("/var/run/jailbreakd.pid");
     unlink("/var/log/jailbreakd-stderr.log.bak");
@@ -25,13 +26,11 @@ int start_jailbreakd(uint64_t kbase, uint64_t kernproc, uint64_t kernelsignpost_
     mkdir("/Library/LaunchDaemons", 0755);
     chown("/Library/LaunchDaemons", 0, 0);
 
-    LOG(@"file_exist  /chimera/jailbreakd.plist: %d", file_exist("/chimera/jailbreakd.plist"));
-
     NSData *blob = [NSData dataWithContentsOfFile:@"/chimera/jailbreakd.plist"];
     NSMutableDictionary *job = [NSPropertyListSerialization propertyListWithData:blob options:NSPropertyListMutableContainers format:nil error:nil];
 
     job[@"EnvironmentVariables"][@"KernelBase"] = [NSString stringWithFormat:@"0x%16llx", kbase];
-    job[@"EnvironmentVariables"][@"AllProc"] = [NSString stringWithFormat:@"0x%16llx", kernproc];
+    job[@"EnvironmentVariables"][@"AllProc"] = [NSString stringWithFormat:@"0x%16llx", get_allproc()];
     job[@"EnvironmentVariables"][@"KernelSignpost"] = [NSString stringWithFormat:@"0x%16llx", kernelsignpost_addr];
     
     [job writeToFile:@"/chimera/jailbreakd.plist" atomically:YES];

@@ -5,6 +5,7 @@
 #include "krw.h"
 
 extern uint64_t g_kernproc;
+extern uint64_t g_kbase;
 
 uint64_t proc_of_pid(pid_t pid) {
     uint64_t proc = g_kernproc;
@@ -46,4 +47,8 @@ pid_t pid_by_name(char* nm) {
     uint64_t proc = proc_by_name(nm);
     if(proc == -1) return -1;
     return kread32(proc + off_p_pid);
+}
+
+uint64_t get_allproc(void) {
+    return off_allproc + (g_kbase - 0xfffffff007004000);
 }

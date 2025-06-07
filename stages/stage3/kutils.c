@@ -78,7 +78,7 @@ void set_ucred_cr_svuid(pid_t pid, uint64_t val) {
 
 uint64_t write_kernelsignpost(void) {
 // [0xfffffff0008c0000+0x000] 72 74 6C 65 00 00 00 00  00 40 80 1D F0 FF FF FF  |  rtle.....@...... (rtle) (0xFFFFFFF01D804000=kbase)
-// [0xfffffff0008c0000+0x010] 00 00 80 16 00 00 00 00  E8 96 0D 1F F0 FF FF FF  |  ................ (kslide) (0xFFFFFFF01F0D96E8=allproc(*actually kernproc))
+// [0xfffffff0008c0000+0x010] 00 00 80 16 00 00 00 00  E8 96 0D 1F F0 FF FF FF  |  ................ (kslide) (0xFFFFFFF01F0D96E8=allproc(*actually allproc))
 // [0xfffffff0008c0000+0x020] 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |  ................ 
 // [0xfffffff0008c0000+0x030] 61 66 74 65 72 67 6C 6F  77 20 69 73 20 70 72 65  |  afterglow is pre 
 // [0xfffffff0008c0000+0x040] 74 74 79 20 64 61 72 6E  20 67 72 65 61 74 2C 20  |  tty darn great,  
@@ -98,7 +98,7 @@ uint64_t write_kernelsignpost(void) {
     kernelsignpost_data[0] = 0x656c7472;
     kernelsignpost_data[1] = g_kbase;
     kernelsignpost_data[2] = (g_kbase - 0xfffffff007004000);
-    kernelsignpost_data[3] = (g_kernproc);
+    kernelsignpost_data[3] = (get_allproc());
 
     kwritebuf(kernelsignpost_addr, kernelsignpost_data, sizeof(kernelsignpost_data));
 
