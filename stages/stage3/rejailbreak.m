@@ -154,11 +154,11 @@ int rejailbreak_chimera(void) {
     if(is_enabled_tweak) {
         unlink("/.disable_tweakinject");
         startDaemons();
-        LOG(@"done rejailbreak_chimera, userspace rebooting now!");
+        LOG(@"done rejailbreak_chimera");
         usleep(100000u);
         unborrow_cr_label(getpid(), our_cr_label);
-        popupTimeout(CFSTR("rejailbreak done"), CFSTR("userspace rebooting..."), CFSTR("OK"), NULL, NULL, 3);
-        sleep(3);
+        int state = popup(CFSTR("re-jailbreak done"), CFSTR("Will you userspace reboot for now?"), CFSTR("Yes"), CFSTR("No"), NULL) + 1;
+        if (state == 2) return 0;
         run_userspace_reboot();
 
     } else {
