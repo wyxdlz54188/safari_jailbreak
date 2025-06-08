@@ -74,27 +74,13 @@ int rejailbreak_chimera(void) {
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
     LOG(@"start_jailbreakd success");
-    // jailbreakd_client, getpid(), 1
-    int rv;
-    pid_t pd;
-    // const char* args_jailbreakd_client[] = {"jailbreakd_client", itoa(getpid()), "1", NULL};
-    // rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client, NULL);
-    // waitpid(pd, NULL, 0);
 
-    pid_t our_pid;
+    // jailbreakd_client, launchd_pid, 1 (1 = entitle+platformize the target PID)
+    int rv = 0;
+    pid_t pd = 0;
     uint32_t flags = 0;
     #define DESIRED_FLAGS  (CS_GET_TASK_ALLOW | CS_PLATFORM_BINARY | CS_DEBUGGED)
-    // while (true)
-    // {
-    //   our_pid = getpid();
-    //   csops(our_pid, 0, &flags, 0);
-    //   if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
-    //     break;
-    //   usleep(100000);
-    // }
-    // LOG(@"jailbreakd_client called success 1");
 
-    // jailbreakd_client, launchd_pid
     const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", "1", NULL};
     rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client_2, NULL);
     waitpid(pd, NULL, 0);
@@ -108,8 +94,7 @@ int rejailbreak_chimera(void) {
         break;
       usleep(100000);
     }
-    LOG(@"jailbreakd_client called success 2");
-// goto test;
+    LOG(@"jailbreakd_client success");
 
     // inject_criticald, 1, /chimera/pspawn_payload.dylib
     const char* args_inject_criticald[] = {"inject_criticald", "1", "/chimera/pspawn_payload.dylib", NULL};
@@ -135,20 +120,10 @@ int rejailbreak_chimera(void) {
     uint64_t launchd_vnode = get_vnode_at_path("/sbin/launchd");
     uint32_t launchd_v_use_count = kread32(launchd_vnode + off_vnode_v_usecount);
     kwrite32(launchd_vnode + off_vnode_v_usecount, launchd_v_use_count + 1);
-    //instead kcall vnode_put?, I think it only needs when kcall vnode_lookup
-    // uint32_t launchd_v_io_count = kread32(launchd_vnode + off_vnode_v_iocount);
-    // LOG(@"launchd_v_io_count: %u", launchd_v_io_count);
-    // if(launchd_v_io_count > 0)
-    //     kwrite32(launchd_vnode + off_vnode_v_iocount, launchd_v_io_count - 1);
     
     uint64_t xpcproxy_vnode = get_vnode_at_path("/usr/libexec/xpcproxy");
     uint32_t xpcproxy_v_use_count = kread32(xpcproxy_vnode + off_vnode_v_usecount);
     kwrite32(xpcproxy_vnode + off_vnode_v_usecount, xpcproxy_v_use_count + 1);
-    //instead kcall vnode_put?, I think it only needs when kcall vnode_lookup
-    // uint32_t xpcproxy_v_io_count = kread32(xpcproxy_vnode + off_vnode_v_iocount);
-    // LOG(@"xpcproxy_v_io_count: %u", xpcproxy_v_io_count);
-    // if(xpcproxy_v_io_count > 0)
-    //     kwrite32(xpcproxy_vnode + off_vnode_v_iocount, xpcproxy_v_io_count - 1);
 
     bool is_enabled_tweak = true;   // at this moment, always enabled now.
     if(is_enabled_tweak) {
@@ -156,12 +131,10 @@ int rejailbreak_chimera(void) {
         startDaemons();
         LOG(@"done rejailbreak_chimera");
         usleep(100000u);
-test:
+
         unborrow_cr_label(getpid(), our_cr_label);
-        // XXX : need to be fixed why userspace reboot make panic after boot!
-        int state = popup(CFSTR("re-jailbreak done"), CFSTR("Choose userspace or ldrestart\n(userspace reboot has bugs that panic after boot, *sigh*)"), CFSTR("userspace reboot"), CFSTR("ldrestart"), NULL) + 1;
+        int state = popup(CFSTR("re-jailbreak done"), CFSTR("Choose userspace reboot or stay\n"), CFSTR("userspace reboot"), CFSTR("stay"), NULL) + 1;
         if (state == 2) {
-            run_ldrestart();
             return 0;
         }
         run_userspace_reboot();
@@ -213,20 +186,6 @@ int run_userspace_reboot(void) {
     pid_t pid;
     char *argv[] = {"launchctl", "reboot", "userspace", NULL};
     int status = posix_spawn(&pid, "/chimera/launchctl", NULL, NULL, argv, NULL);
-    if (status == 0) {
-        LOG(@"posix_spawned pid: %d\n", pid);
-        if (waitpid(pid, &status, 0) == -1) {
-            perror("waitpid");
-        }
-    } else {
-        LOG(@"posix_spawn: %d(%s)\n", status, strerror(status));
-    }
-}
-
-int run_ldrestart(void) {
-    pid_t pid;
-    char *argv[] = {"ldrestart", NULL};
-    int status = posix_spawn(&pid, "/usr/bin/ldrestart", NULL, NULL, argv, NULL);
     if (status == 0) {
         LOG(@"posix_spawned pid: %d\n", pid);
         if (waitpid(pid, &status, 0) == -1) {
