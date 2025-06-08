@@ -41,7 +41,7 @@ int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, 
     wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
 
     
-    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {}; ////wait until stage3 get hsp4
+    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {usleep(100000u);}; //wait until stage3 get hsp4
 
     //restore
     wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), spawned_ucred);

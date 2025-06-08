@@ -74,42 +74,42 @@ int rejailbreak_chimera(void) {
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
     LOG(@"start_jailbreakd success");
-
     // jailbreakd_client, getpid(), 1
     int rv;
     pid_t pd;
-    const char* args_jailbreakd_client[] = {"jailbreakd_client", itoa(getpid()), "1", NULL};
-    rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client, NULL);
-    waitpid(pd, NULL, 0);
+    // const char* args_jailbreakd_client[] = {"jailbreakd_client", itoa(getpid()), "1", NULL};
+    // rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client, NULL);
+    // waitpid(pd, NULL, 0);
 
     pid_t our_pid;
-    uint32_t flags;
+    uint32_t flags = 0;
     #define DESIRED_FLAGS  (CS_GET_TASK_ALLOW | CS_PLATFORM_BINARY | CS_DEBUGGED)
-    while (true)
-    {
-      our_pid = getpid();
-      csops(our_pid, 0, &flags, 0);
-      if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
-        break;
-      usleep(100000);
-    }
-    LOG(@"jailbreakd_client called success 1");
+    // while (true)
+    // {
+    //   our_pid = getpid();
+    //   csops(our_pid, 0, &flags, 0);
+    //   if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
+    //     break;
+    //   usleep(100000);
+    // }
+    // LOG(@"jailbreakd_client called success 1");
 
     // jailbreakd_client, launchd_pid
     const char* args_jailbreakd_client_2[] = {"jailbreakd_client", "1", "1", NULL};
     rv = posix_spawn(&pd, "/chimera/jailbreakd_client", NULL, NULL, (char **)&args_jailbreakd_client_2, NULL);
     waitpid(pd, NULL, 0);
 
-    pid_t launchd_pid;
+    flags = 0;
     while (true)
     {
-      launchd_pid = 1;
+      pid_t launchd_pid = 1;
       csops(launchd_pid, 0, &flags, 0);
       if ((flags & DESIRED_FLAGS) == DESIRED_FLAGS)
         break;
       usleep(100000);
     }
     LOG(@"jailbreakd_client called success 2");
+// goto test;
 
     // inject_criticald, 1, /chimera/pspawn_payload.dylib
     const char* args_inject_criticald[] = {"inject_criticald", "1", "/chimera/pspawn_payload.dylib", NULL};
@@ -156,6 +156,7 @@ int rejailbreak_chimera(void) {
         startDaemons();
         LOG(@"done rejailbreak_chimera");
         usleep(100000u);
+test:
         unborrow_cr_label(getpid(), our_cr_label);
         // XXX : need to be fixed why userspace reboot make panic after boot!
         int state = popup(CFSTR("re-jailbreak done"), CFSTR("Choose userspace or ldrestart\n(userspace reboot has bugs that panic after boot, *sigh*)"), CFSTR("userspace reboot"), CFSTR("ldrestart"), NULL) + 1;
