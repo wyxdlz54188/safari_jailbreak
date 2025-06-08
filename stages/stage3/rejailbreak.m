@@ -14,8 +14,7 @@
 #import "bootstrap.h"
 #import "start_jailbreakd.h"
 #import "rejailbreak.h"
-#import "amfi_utils.h"
-#import "inject.h"
+#import "trustcache.h"
 
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
 
@@ -142,6 +141,7 @@ int rejailbreak_chimera(void) {
         usleep(100000u);
         unborrow_cr_label(getpid(), our_cr_label);
         run_userspace_reboot();
+        run("/chimera/launchctl reboot userspace");
     } else {
         int disable_tweakinject_fd = open("/.disable_tweakinject", O_RDWR | O_CREAT);
         close(disable_tweakinject_fd);
@@ -196,6 +196,6 @@ int run_userspace_reboot(void) {
             perror("waitpid");
         }
     } else {
-        LOG(@"posix_spawn: %s\n", strerror(status));
+        LOG(@"posix_spawn: %d(%s)\n", status, strerror(status));
     }
 }

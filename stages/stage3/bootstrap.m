@@ -1,7 +1,7 @@
 #include "bootstrap.h"
 #include "NSData+GZip.h"
-#include "amfi_utils.h"
 #include "stage3.h"
+#include "trustcache.h"
 
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -22,6 +22,8 @@
 #include "chimera/tar_gz.h"
 #include "chimera/jailbreakd_arm64.h"
 #endif
+
+extern uint64_t g_trustcache;
 
 #define cp(to, from) copyfile(from, to, 0, COPYFILE_ALL)
 
@@ -69,7 +71,10 @@ void extract_bootstrap() {
     mkdir("/chimera", 0755);
     extractGz("/tmp/tar.gz", "/chimera/tar");
     chmod("/chimera/tar", 0755);
-    inject_trusts(1, (const char **)&(const char*[]){"/chimera/tar"});
+    NSMutableArray<NSString *> *tc_files = @[
+        @"/chimera/tar"
+    ];
+    injectTrustCache(tc_files, g_trustcache);
 
     unlink("/chimera/jailbreakd");
     unlink("/chimera/jailbreakd_client");
@@ -95,14 +100,15 @@ void extract_bootstrap() {
     unlink("/usr/lib/pspawn_payload-stg2.dylib");
     cp("/usr/lib/pspawn_payload-stg2.dylib", "/chimera/pspawn_payload-stg2.dylib");
 
-    inject_trusts(6, (const char **)&(const char*[]){
-        "/chimera/inject_criticald",
-        "/chimera/pspawn_payload.dylib",
-        "/chimera/pspawn_payload-stg2.dylib",
-        "/chimera/jailbreakd",
-        "/chimera/jailbreakd_client",
-        "/chimera/launchctl"
-    });
+    tc_files = @[
+        @"/chimera/inject_criticald",
+        @"/chimera/pspawn_payload.dylib",
+        @"/chimera/pspawn_payload-stg2.dylib",
+        @"/chimera/jailbreakd",
+        @"/chimera/jailbreakd_client",
+        @"/chimera/launchctl"
+    ];
+    injectTrustCache(tc_files, g_trustcache);
 }
 
 void extractGz(const char *from, const char *to) {

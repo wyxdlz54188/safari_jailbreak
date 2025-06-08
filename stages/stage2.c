@@ -88,14 +88,11 @@ int main() {
 
   //hsp4 patch
   setHSP4();
-  // mach_port_t hsp4 = MACH_PORT_NULL;
-  // host_get_special_port(mach_host_self(), HOST_LOCAL_NODE, 4, &hsp4);
-  // asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] hsp4 = 0x%x", hsp4);
 
   //prepare stage3
   extract_stage3();
-  int ret = trustbin(stage3_path);
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] trustbin ret = 0x%x", ret);
+  int tc_ret = injectTrustCache(stage3_path, (kernel_slide + koffset(KOFFSET_TRUSTCACHE)));
+  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] injectTrustCache ret = 0x%x", tc_ret);
   chmod(stage3_path, 0755);
   
   //restore ucred

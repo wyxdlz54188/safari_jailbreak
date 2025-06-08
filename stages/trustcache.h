@@ -1,1 +1,1 @@
-int trustbin(const char *path);
+int injectTrustCache(char* path, uint64_t trust_chain);

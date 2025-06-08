@@ -10,7 +10,7 @@
 #include <mach/mach.h>
 #include <dlfcn.h>
 
-#include "inject.h"
+#include "trustcache.h"
 #include "stage3.h"
 #include "krw.h"
 #include "CSCommon.h"
@@ -51,10 +51,6 @@ struct hash_entry_t {
 } __attribute__((packed));
 
 typedef uint8_t hash_t[TRUST_CDHASH_LEN];
-
-// bool check_amfi(NSString *path) {
-//     return MISValidateSignatureAndCopyInfo(path, @{kMISValidationOptionAllowAdHocSigning: @YES, kMISValidationOptionRespectUppTrustAndAuthorization: @YES}, NULL) == 0;
-// }
 
 NSString *cdhashFor(NSString *file) {
     NSString *cdhash = nil;
@@ -105,13 +101,7 @@ NSArray *filteredHashes(uint64_t trust_chain, NSDictionary *hashes) {
   NSArray *result;
   @autoreleasepool {
 #endif
-      NSMutableDictionary *filtered = [hashes mutableCopy];
-    // for (NSData *cdhash in [filtered allKeys]) {
-    //     if (check_amfi(filtered[cdhash])) {
-    //         LOG(@"%s: already in static trustcache, not reinjecting\n", [filtered[cdhash] UTF8String]);
-    //         [filtered removeObjectForKey:cdhash];
-    //     }
-    // }
+    NSMutableDictionary *filtered = [hashes mutableCopy];
 
     struct trust_mem search;
     search.next = trust_chain;

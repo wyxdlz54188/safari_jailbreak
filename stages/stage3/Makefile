@@ -13,7 +13,7 @@ include $(THEOS)/makefiles/common.mk
 
 TOOL_NAME = stage3
 
-stage3_FILES = stage3.m krw.c alert.c rejailbreak.m offsets.m proc.c kutils.c remount.c bootstrap.m NSData+GZip.m amfi_utils.m start_jailbreakd.m inject.m
+stage3_FILES = stage3.m krw.c alert.c rejailbreak.m offsets.m proc.c kutils.c remount.c bootstrap.m NSData+GZip.m start_jailbreakd.m trustcache.m
 stage3_CFLAGS = -fobjc-arc
 stage3_CODESIGN_FLAGS = -Sentitlements.plist
 stage3_FRAMEWORKS = Foundation IOKit Security
