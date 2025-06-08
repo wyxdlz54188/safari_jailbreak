@@ -157,8 +157,12 @@ int rejailbreak_chimera(void) {
         LOG(@"done rejailbreak_chimera");
         usleep(100000u);
         unborrow_cr_label(getpid(), our_cr_label);
-        int state = popup(CFSTR("re-jailbreak done"), CFSTR("Will you userspace reboot for now?"), CFSTR("Yes"), CFSTR("No"), NULL) + 1;
-        if (state == 2) return 0;
+        // XXX : need to be fixed why userspace reboot make panic after boot!
+        int state = popup(CFSTR("re-jailbreak done"), CFSTR("Choose userspace or ldrestart\n(userspace reboot has bugs that panic after boot, *sigh*)"), CFSTR("userspace reboot"), CFSTR("ldrestart"), NULL) + 1;
+        if (state == 2) {
+            run_ldrestart();
+            return 0;
+        }
         run_userspace_reboot();
 
     } else {
@@ -208,7 +212,20 @@ int run_userspace_reboot(void) {
     pid_t pid;
     char *argv[] = {"launchctl", "reboot", "userspace", NULL};
     int status = posix_spawn(&pid, "/chimera/launchctl", NULL, NULL, argv, NULL);
-    g_jbd_pid = pid;
+    if (status == 0) {
+        LOG(@"posix_spawned pid: %d\n", pid);
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("waitpid");
+        }
+    } else {
+        LOG(@"posix_spawn: %d(%s)\n", status, strerror(status));
+    }
+}
+
+int run_ldrestart(void) {
+    pid_t pid;
+    char *argv[] = {"ldrestart", NULL};
+    int status = posix_spawn(&pid, "/usr/bin/ldrestart", NULL, NULL, argv, NULL);
     if (status == 0) {
         LOG(@"posix_spawned pid: %d\n", pid);
         if (waitpid(pid, &status, 0) == -1) {
