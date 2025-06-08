@@ -35,6 +35,7 @@ uint32_t off_task_t_flags = 0;
 uint32_t off_ipc_space_is_table = 0;
 
 uint32_t off_vnode_v_usecount = 0;
+uint32_t off_vnode_v_iocount = 0;
 uint32_t off_vnode_v_type = 0;
 uint32_t off_vnode_vu_ubcinfo = 0;
 uint32_t off_vnode_v_parent = 0;
@@ -85,6 +86,7 @@ void offsets_init(void) {
         off_ipc_space_is_table = 0x20;
 
         off_vnode_v_usecount = 0x60;
+        off_vnode_v_iocount = 0x64;
         off_vnode_v_type = 0x70;
         off_vnode_vu_ubcinfo = 0x78;
         off_vnode_v_parent = 0xc0;

@@ -25,6 +25,7 @@ extern uint32_t off_task_t_flags;
 extern uint32_t off_ipc_space_is_table;
 
 extern uint32_t off_vnode_v_usecount;
+extern uint32_t off_vnode_v_iocount;
 extern uint32_t off_vnode_v_type;
 extern uint32_t off_vnode_vu_ubcinfo;
 extern uint32_t off_vnode_v_parent;

@@ -15,6 +15,7 @@
 #import "start_jailbreakd.h"
 #import "rejailbreak.h"
 #import "trustcache.h"
+#import "alert.h"
 
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
 
@@ -118,20 +119,36 @@ int rejailbreak_chimera(void) {
 
     dlopen("/usr/lib/pspawn_payload-stg2.dylib", RTLD_NOW);
 
+    //maybe_setup_smth
+    //not implemented
+
+    //maybe_setup_some_sileo_packages
+    run("uicache -p /Applications/Sileo.app");
+
     update_springboard_plist();
     LOG(@"update_springboard_plist done");
 
     pid_t cfprefsd_pid = pid_by_name("cfprefsd");
     kill(cfprefsd_pid, 9);
-    LOG(@"cfprefsd killed");
+    LOG(@"cfprefsd(%u) killed", cfprefsd_pid);
 
     uint64_t launchd_vnode = get_vnode_at_path("/sbin/launchd");
     uint32_t launchd_v_use_count = kread32(launchd_vnode + off_vnode_v_usecount);
     kwrite32(launchd_vnode + off_vnode_v_usecount, launchd_v_use_count + 1);
-
+    //instead kcall vnode_put?, I think it only needs when kcall vnode_lookup
+    // uint32_t launchd_v_io_count = kread32(launchd_vnode + off_vnode_v_iocount);
+    // LOG(@"launchd_v_io_count: %u", launchd_v_io_count);
+    // if(launchd_v_io_count > 0)
+    //     kwrite32(launchd_vnode + off_vnode_v_iocount, launchd_v_io_count - 1);
+    
     uint64_t xpcproxy_vnode = get_vnode_at_path("/usr/libexec/xpcproxy");
     uint32_t xpcproxy_v_use_count = kread32(xpcproxy_vnode + off_vnode_v_usecount);
     kwrite32(xpcproxy_vnode + off_vnode_v_usecount, xpcproxy_v_use_count + 1);
+    //instead kcall vnode_put?, I think it only needs when kcall vnode_lookup
+    // uint32_t xpcproxy_v_io_count = kread32(xpcproxy_vnode + off_vnode_v_iocount);
+    // LOG(@"xpcproxy_v_io_count: %u", xpcproxy_v_io_count);
+    // if(xpcproxy_v_io_count > 0)
+    //     kwrite32(xpcproxy_vnode + off_vnode_v_iocount, xpcproxy_v_io_count - 1);
 
     bool is_enabled_tweak = true;   // at this moment, always enabled now.
     if(is_enabled_tweak) {
@@ -140,8 +157,10 @@ int rejailbreak_chimera(void) {
         LOG(@"done rejailbreak_chimera, userspace rebooting now!");
         usleep(100000u);
         unborrow_cr_label(getpid(), our_cr_label);
+        popupTimeout(CFSTR("rejailbreak done"), CFSTR("userspace rebooting..."), CFSTR("OK"), NULL, NULL, 3);
+        sleep(3);
         run_userspace_reboot();
-        run("/chimera/launchctl reboot userspace");
+
     } else {
         int disable_tweakinject_fd = open("/.disable_tweakinject", O_RDWR | O_CREAT);
         close(disable_tweakinject_fd);
