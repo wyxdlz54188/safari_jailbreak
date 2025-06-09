@@ -18,7 +18,7 @@
 
 extern mach_port_t tfp0;
 
-extern uint64_t koffset_zone_map_ref;
+extern uint64_t zone_map_ref_addr;
 
 uint64_t ipc_space_kernel() {
     return kread64(task_get_ipc_port(pinfo(task), mach_task_self()) + koffsetof(ipc_port, receiver));
@@ -172,7 +172,7 @@ int patch_hsp4() {
 
     // strref \"Nothing being freed to the zone_map. start = end = %p\\n\"
     // or traditional \"zone_init: kmem_suballoc failed\"
-    uint64_t zone_map_kptr = koffset_zone_map_ref;
+    uint64_t zone_map_kptr = zone_map_ref_addr;
     uint64_t zone_map = kread64(zone_map_kptr);
 
     uint64_t kernel_map = kinfo(vm_map);

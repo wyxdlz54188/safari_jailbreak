@@ -26,7 +26,7 @@
 
 extern mach_port_t tfp0;
 
-uint64_t koffset_zone_map_ref = 0;
+uint64_t zone_map_ref_addr;
 
 char stage3_path[1024];
 
@@ -57,11 +57,43 @@ int extract_stage3(void) {
   return 0;
 }
 
+int load_offsets(const char *path,
+                 uint64_t *trustcache_addr,
+                 uint64_t *koffset_zone_map_ref) {
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+    if (fscanf(f,
+               "trustcache_addr=0x%llx\n"
+               "koffset_zone_map_ref=0x%llx",
+               trustcache_addr,
+               koffset_zone_map_ref) != 2) {
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+    return 0;
+}
+
+int save_offsets(const char *path,
+                 uint64_t trustcache_addr,
+                 uint64_t koffset_zone_map_ref) {
+    FILE *f = fopen(path, "w");
+    if (!f) return -1;
+    fprintf(f,
+            "trustcache_addr=0x%llx\n"
+            "koffset_zone_map_ref=0x%llx\n",
+            trustcache_addr,
+            koffset_zone_map_ref);
+    fclose(f);
+    return 0;
+}
+
 int main() {
   LOG("loaded");
 
   kernel_rw_init();
   tfp0_init();
+  LOG("tfp0: 0x%x", tfp0);
 
   set_csflags(pinfo(proc));
   set_tfplatform(pinfo(proc));
@@ -69,11 +101,23 @@ int main() {
   uint64_t self_ucred = borrow_ucreds(getpid(), 1);
   setuid(0); setuid(0);
 
+  uint64_t trustcache_addr = 0;
+  zone_map_ref_addr = 0;
+  const char* offsets_path = "/var/log/jbme-offsets.txt";
   // kpf
-  pfinder_t pfinder;
-  if(pfinder_init(&pfinder) != KERN_SUCCESS) return -1;
-  uint64_t trustcache_addr = pfinder_trustcache(pfinder);
-  koffset_zone_map_ref = pfinder_zone_map_ref(pfinder);
+  if (load_offsets(offsets_path, &trustcache_addr, &zone_map_ref_addr) != 0 
+      || trustcache_addr == 0
+      || zone_map_ref_addr == 0) {
+    pfinder_t pfinder;
+    if(pfinder_init(&pfinder) != KERN_SUCCESS) return -1;
+    trustcache_addr = pfinder_trustcache(pfinder);
+    zone_map_ref_addr = pfinder_zone_map_ref(pfinder);
+
+    save_offsets(offsets_path, trustcache_addr - kinfo(slide), zone_map_ref_addr - kinfo(slide));
+  } else {
+    trustcache_addr += kinfo(slide);
+    zone_map_ref_addr += kinfo(slide);
+  }
 
   patch_hsp4();
 
