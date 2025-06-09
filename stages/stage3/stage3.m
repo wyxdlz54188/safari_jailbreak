@@ -49,6 +49,7 @@ int main(int argc, char *argv[], char *envp[]) {
 		unlink("/tmp/stage3_got_hsp4");
 		NSString *msg = [NSString stringWithFormat:@"hsp4: 0x%x, kbase: %s", g_hsp4, argv[1]];
 		popupTimeout(CFSTR("kernel pwned"), (__bridge CFStringRef)msg, CFSTR("OK"), NULL, NULL, 3);
+		usleep(3000000u);
 
 		rejailbreak_chimera();
 

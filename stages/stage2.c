@@ -17,6 +17,7 @@
 #include "hsp4.h"
 #include "kutils.h"
 #include "log.h"
+#include "kpf.h"
 #include "physpuppet/exploit.h"
 #include "physpuppet/libprejailbreak.h"
 #include "physpuppet/offsets.h"
@@ -24,6 +25,8 @@
 #include "physpuppet/tfp0.h"
 
 extern mach_port_t tfp0;
+
+uint64_t koffset_zone_map_ref = 0;
 
 char stage3_path[1024];
 
@@ -69,6 +72,16 @@ int main() {
   kernel_rw_init();
   tfp0_init();
 
+  // kpf
+  pfinder_t pfinder;
+  if(pfinder_init(&pfinder) != KERN_SUCCESS) {
+    kernel_rw_deinit();
+    return -1;
+  }
+
+  uint64_t trustcache_addr = pfinder_trustcache(pfinder);
+  koffset_zone_map_ref = pfinder_zone_map_ref(pfinder);
+
   set_csflags(pinfo(proc));
   set_tfplatform(pinfo(proc));
 
@@ -80,7 +93,7 @@ int main() {
 
   // prepare stage3
   extract_stage3();
-  int tc_ret = inject_trustcache(stage3_path, (kinfo(slide) + 0xfffffff008930e80)); // XXX HARDCODED offsets; 5s 12.5.7 
+  int tc_ret = inject_trustcache(stage3_path, trustcache_addr);
   LOG("inject_trustcache ret = %d", tc_ret);
   chmod(stage3_path, 0755);
   
@@ -101,7 +114,7 @@ int main() {
 
   char trustcache_str[19];
   memset(trustcache_str, 0, 19);
-  snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, 0xfffffff008930e80 + kinfo(slide)); // XXX HARDCODED offsets; 5s 12.5.7 
+  snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, trustcache_addr);
 
   launch_stage3(stage3_path, kernel_base_str, kern_proc_str, trustcache_str, NULL, NULL, NULL, NULL);
 

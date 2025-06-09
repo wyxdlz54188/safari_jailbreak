@@ -21,24 +21,3 @@ uint64_t task_get_ipc_port(uint64_t task, mach_port_t port) {
   uint64_t entry = kread64(table + (IPC_ENTRY_SIZE * (uint64_t)(port >> 8)));
   return entry;
 }
-
-uint64_t task_get_ipc_port_kobject(uint64_t task, mach_port_t port) {
-  uint64_t entry = task_get_ipc_port(task, port);
-  uint32_t bits = kread32(entry);
-  if (gOffsets.major >= MAJOR(14) && (bits & 0x400) != 0) {
-    uint64_t label = kread64(entry + koffsetof(ipc_port, kobject));
-    return kread64(label + 0x8);
-  }
-
-  return kread64(entry + koffsetof(ipc_port, kobject));
-}
-
-void proc_remove_csflags(uint64_t proc, uint32_t flags) {
-  uint32_t currentFlags = kread32(proc + koffsetof(proc, csflags));
-  kwrite32(proc + koffsetof(proc, csflags), currentFlags & ~flags);
-}
-
-void proc_add_csflags(uint64_t proc, uint32_t flags) {
-  uint32_t currentFlags = kread32(proc + koffsetof(proc, csflags));
-  kwrite32(proc + koffsetof(proc, csflags), currentFlags | flags);
-}

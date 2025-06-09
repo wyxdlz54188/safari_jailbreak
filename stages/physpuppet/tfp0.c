@@ -167,21 +167,6 @@ void kfree_tfp0(uint64_t address, size_t size) {
     mach_vm_deallocate(tfp0, address, size);
 }
 
-int kread_tfp0(uint64_t va, void *buffer, size_t size) {
-    int rv;
-    size_t offset = 0;
-    while (offset < size) {
-        mach_vm_size_t sz, chunk = 2048;
-        if (chunk > size - offset) {
-            chunk = size - offset;
-        }
-        rv = mach_vm_read_overwrite(tfp0, va + offset, chunk, (mach_vm_address_t)buffer + offset, &sz);
-        if (rv != 0) return -1;
-        offset += sz;
-    }
-    return 0;
-}
-
 int kwrite_tfp0(uint64_t va, void *buffer, size_t size) {
     int rv;
     size_t offset = 0;
@@ -195,46 +180,6 @@ int kwrite_tfp0(uint64_t va, void *buffer, size_t size) {
         offset += chunk;
     }
     return 0;
-}
-
-uint8_t kread8_tfp0(uint64_t va) {
-    uint8_t val = 0;
-    kread_tfp0(va, &val, sizeof(val));
-    return val;
-}
-
-uint16_t kread16_tfp0(uint64_t va) {
-    uint16_t val = 0;
-    kread_tfp0(va, &val, sizeof(val));
-    return val;
-}
-
-uint32_t kread32_tfp0(uint64_t va) {
-    uint32_t val = 0;
-    kread_tfp0(va, &val, sizeof(val));
-    return val;
-}
-
-uint64_t kread64_tfp0(uint64_t va) {
-    uint64_t val = 0;
-    kread_tfp0(va, &val, sizeof(val));
-    return val;
-}
-
-int kwrite8_tfp0(uint64_t va, uint8_t val) {
-    return kwrite_tfp0(va, &val, sizeof(val));
-}
-
-int kwrite16_tfp0(uint64_t va, uint16_t val) {
-    return kwrite_tfp0(va, &val, sizeof(val));
-}
-
-int kwrite32_tfp0(uint64_t va, uint32_t val) {
-    return kwrite_tfp0(va, &val, sizeof(val));
-}
-
-int kwrite64_tfp0(uint64_t va, uint64_t val) {
-    return kwrite_tfp0(va, &val, sizeof(val));
 }
 
 int tfp0_init(void) {
@@ -271,7 +216,7 @@ int tfp0_init(void) {
         kwritebuf(fakeTask, fakeTaskUaddr, sizeof(ktask_t));
 
         tfp0 = fakePort;
-        kernel_rw_deinit();
+        // kernel_rw_deinit();
 
         uint64_t newFakeTask = kalloc_tfp0(0x600);
         kwrite_tfp0(newFakeTask, fakeTaskUaddr, sizeof(ktask_t));
@@ -283,16 +228,6 @@ int tfp0_init(void) {
         return -1;
     }
 
-    gPrimitives.kread8 = kread8_tfp0;
-    gPrimitives.kread16 = kread16_tfp0;
-    gPrimitives.kread32 = kread32_tfp0;
-    gPrimitives.kread64 = kread64_tfp0;
-    gPrimitives.kwrite8 = kwrite8_tfp0;
-    gPrimitives.kwrite16 = kwrite16_tfp0;
-    gPrimitives.kwrite32 = kwrite32_tfp0;
-    gPrimitives.kwrite64 = kwrite64_tfp0;
-    gPrimitives.kreadbuf = kread_tfp0;
-    gPrimitives.kwritebuf = kwrite_tfp0;
     gPrimitives.kalloc = kalloc_tfp0;
     gPrimitives.kfree = kfree_tfp0;
 

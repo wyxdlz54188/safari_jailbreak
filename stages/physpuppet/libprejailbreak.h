@@ -75,20 +75,6 @@ uint64_t vm_map_self(void);
 uint64_t pmap_self(void);
 
 /*
-* @brief Read an 8-bit value at a kernel memory address.
-* @param[in] va
-* @returns Value at that address, zero if primitive not setup.
-*/
-uint8_t kread8(uint64_t va);
-
-/*
-* @brief Read a 16-bit value at a kernel memory address.
-* @param[in] va
-* @returns Value at that address, zero if primitive not setup.
-*/
-uint16_t kread16(uint64_t va);
-
-/*
 * @brief Read a 32-bit value at a kernel memory address.
 * @param[in] va
 * @returns Value at that address, zero if primitive not setup.
@@ -108,22 +94,6 @@ uint64_t kread64(uint64_t va);
 * @returns Value at that address, zero if primitive not setup.
 */
 uint64_t kread_ptr(uint64_t va);
-
-/*
-* @brief Write an 8-bit value to a kernel memory address.
-* @param[in] va
-* @param[in] value
-* @returns Error code
-*/
-int kwrite8(uint64_t va, uint8_t val);
-
-/*
-* @brief Write a 16-bit value to a kernel memory address.
-* @param[in] va
-* @param[in] value
-* @returns Error code
-*/
-int kwrite16(uint64_t va, uint16_t val);
 
 /*
 * @brief Write a 32-bit value to a kernel memory address.

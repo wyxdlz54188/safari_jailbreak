@@ -23,16 +23,6 @@ uint64_t pmap_self(void) {
     return pinfo(pmap);
 }
 
-uint8_t kread8(uint64_t va) {
-    if (!gPrimitives.kread8) return 0;
-    return gPrimitives.kread8(va);
-}
-
-uint16_t kread16(uint64_t va) {
-    if (!gPrimitives.kread16) return 0;
-    return gPrimitives.kread16(va);
-}
-
 uint32_t kread32(uint64_t va) {
     if (!gPrimitives.kread32) return 0;
     return gPrimitives.kread32(va);
@@ -51,16 +41,6 @@ uint64_t kread_ptr(uint64_t va) {
 int kreadbuf(uint64_t va, void *buffer, size_t size) {
     if (!gPrimitives.kreadbuf) return -1;
     return gPrimitives.kreadbuf(va, buffer, size);
-}
-
-int kwrite8(uint64_t va, uint8_t val) {
-    if (!gPrimitives.kwrite8) return -1;
-    return gPrimitives.kwrite8(va, val);
-}
-
-int kwrite16(uint64_t va, uint16_t val) {
-    if (!gPrimitives.kwrite16) return -1;
-    return gPrimitives.kwrite16(va, val);
 }
 
 int kwrite32(uint64_t va, uint32_t val) {

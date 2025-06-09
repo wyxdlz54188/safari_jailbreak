@@ -43,7 +43,6 @@ uint8_t *cdhashFor(const char *filePath) {
                                                  kCFURLPOSIXPathStyle, false);
     CFRelease(cfFile);
     if (!url) {
-        LOG("Invalid file path: %s\n", filePath);
         return NULL;
     }
 
@@ -57,11 +56,8 @@ uint8_t *cdhashFor(const char *filePath) {
             char buf[256] = {0};
             if (errStr &&
                 CFStringGetCString(errStr, buf, sizeof(buf), kCFStringEncodingUTF8)) {
-                LOG("Unable to generate cdhash for %s: %s\n", filePath, buf);
             }
             if (errStr) CFRelease(errStr);
-        } else {
-            LOG("Unable to generate cdhash for %s: OSStatus %d\n", filePath, (int)status);
         }
         return NULL;
     }
@@ -71,7 +67,6 @@ uint8_t *cdhashFor(const char *filePath) {
                                            kSecCSDefaultFlags, &info);
     CFRelease(staticCode);
     if (status != errSecSuccess || !info) {
-        LOG("Unable to copy signing info for %s\n", filePath);
         if (info) CFRelease(info);
         return NULL;
     }
@@ -82,9 +77,9 @@ uint8_t *cdhashFor(const char *filePath) {
     uint8_t *bytes = NULL;
 
     if (!cdhashes) {
-        LOG("%s: no cdhashes\n", filePath);
+        return NULL;
     } else if (!algos) {
-        LOG("%s: no algos\n", filePath);
+        return NULL;
     } else {
         CFIndex count = CFArrayGetCount(algos);
         CFIndex idx = -1;
@@ -99,29 +94,16 @@ uint8_t *cdhashFor(const char *filePath) {
         }
 
         if (idx < 0) {
-            LOG("%s: does not have %s hash\n",
-                filePath, cdHashName[requiredHash]);
+            // LOG("%s: does not have %s hash\n",
+            //     filePath, cdHashName[requiredHash]);
         } else {
             CFTypeRef obj = CFArrayGetValueAtIndex(cdhashes, idx);
             if (CFGetTypeID(obj) != CFDataGetTypeID()) {
-                LOG("%s: expected CFDataRef for cdhash\n", filePath);
+                // LOG("%s: expected CFDataRef for cdhash\n", filePath);
             } else {
                 CFDataRef data = (CFDataRef)obj;
                 CFIndex len = CFDataGetLength(data);
                 bytes = CFDataGetBytePtr(data);
-                if (len > 0 && bytes) {
-                    CFIndex hexLen = len * 2;
-                    hexResult = malloc(hexLen + 1);
-                    if (hexResult) {
-                        for (CFIndex j = 0; j < len; j++) {
-                            sprintf(hexResult + j*2, "%02x", bytes[j]);
-                        }
-                        hexResult[hexLen] = '\0';
-                        LOG("Got cdhash: %s\n", hexResult);
-                    }
-                } else {
-                    LOG("%s: empty cdhash data\n", filePath);
-                }
             }
         }
     }
