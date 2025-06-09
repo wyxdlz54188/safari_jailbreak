@@ -30,20 +30,11 @@ uint64_t koffset_zone_map_ref = 0;
 
 char stage3_path[1024];
 
-int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
+int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
     pid_t spawned_pid;
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
     int rv = posix_spawn(&spawned_pid, binary, NULL, NULL, (char **)&args, env);
-
-    uint64_t spawned_ucred = borrow_ucreds(spawned_pid, 1);
-
-    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {usleep(100000u);};
-
-    unborrow_ucreds(spawned_pid, spawned_ucred);
-
-    int fd = open("/tmp/stage2_done", O_CREAT | O_WRONLY, 0644);
-    if (fd >= 0) close(fd);
 
     if (rv) return rv;
     
@@ -72,22 +63,17 @@ int main() {
   kernel_rw_init();
   tfp0_init();
 
-  // kpf
-  pfinder_t pfinder;
-  if(pfinder_init(&pfinder) != KERN_SUCCESS) {
-    kernel_rw_deinit();
-    return -1;
-  }
-
-  uint64_t trustcache_addr = pfinder_trustcache(pfinder);
-  koffset_zone_map_ref = pfinder_zone_map_ref(pfinder);
-
   set_csflags(pinfo(proc));
   set_tfplatform(pinfo(proc));
 
   uint64_t self_ucred = borrow_ucreds(getpid(), 1);
-
   setuid(0); setuid(0);
+
+  // kpf
+  pfinder_t pfinder;
+  if(pfinder_init(&pfinder) != KERN_SUCCESS) return -1;
+  uint64_t trustcache_addr = pfinder_trustcache(pfinder);
+  koffset_zone_map_ref = pfinder_zone_map_ref(pfinder);
 
   patch_hsp4();
 
@@ -95,14 +81,8 @@ int main() {
   extract_stage3();
   int tc_ret = inject_trustcache(stage3_path, trustcache_addr);
   LOG("inject_trustcache ret = %d", tc_ret);
-  chmod(stage3_path, 0755);
-  
-  unborrow_ucreds(getpid(), self_ucred);
-
-  // unsandbox
-  uint32_t off_sandbox_slot = 0x10;
-  uint64_t saved_sb = kread64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot);
-  kwrite64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot, 0);
+  chmod(stage3_path, 04755);
+  chown(stage3_path, 0, 0);
 
   char kernel_base_str[19];
   memset(kernel_base_str, 0, 19);
@@ -116,11 +96,13 @@ int main() {
   memset(trustcache_str, 0, 19);
   snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, trustcache_addr);
 
-  launch_stage3(stage3_path, kernel_base_str, kern_proc_str, trustcache_str, NULL, NULL, NULL, NULL);
+  launch(stage3_path, kernel_base_str, kern_proc_str, trustcache_str, NULL, NULL, NULL, NULL);
 
-  //restore sandbox
-  kwrite64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot, saved_sb);
-  
+  unborrow_ucreds(getpid(), self_ucred);
+
+  kernel_rw_deinit();
+
+  LOG("done")
 
   while(1) {};
 

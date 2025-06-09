@@ -129,7 +129,6 @@ pfinder_init_kernel(pfinder_t *pfinder, size_t off) {
     if(kreadbuf_wrapper(p, &mh64, sizeof(mh64)) == KERN_SUCCESS && mh64.magic == MH_MAGIC_64 && mh64.cputype == CPU_TYPE_ARM64 &&
        (mh64.filetype == MH_EXECUTE || (off == 0 && mh64.filetype == MH_FILESET))
        ) {
-        LOG("kreadbuf work");
         for(p += sizeof(mh64), e = p + mh64.sizeofcmds; mh64.ncmds-- != 0 && e - p >= sizeof(lc); p += lc.cmdsize) {
             if(kreadbuf_wrapper(p, &lc, sizeof(lc)) != KERN_SUCCESS || lc.cmdsize < sizeof(lc) || e - p < lc.cmdsize) {
                 break;
@@ -150,13 +149,11 @@ pfinder_init_kernel(pfinder_t *pfinder, size_t off) {
                             break;
                         }
                         pfinder->sec_text.s64 = s64;
-                        // printf("sec_text_addr: " KADDR_FMT ", sec_text_off: 0x%" PRIX32 ", sec_text_sz: 0x%" PRIX64 "\n", s64.addr, s64.offset, s64.size);
                     } else if(strncmp(sg64.segname, SEG_TEXT, sizeof(sg64.segname)) == 0) {
                         if(find_section_kernel(p + sizeof(sg64), sg64, SECT_CSTRING, &s64) != KERN_SUCCESS || s64.size == 0 || (pfinder->sec_cstring.data = calloc(1, s64.size + 1)) == NULL || kreadbuf_wrapper(s64.addr, pfinder->sec_cstring.data, s64.size) != KERN_SUCCESS) {
                             break;
                         }
                         pfinder->sec_cstring.s64 = s64;
-                        // printf("sec_cstring_addr: " KADDR_FMT ", sec_cstring_off: 0x%" PRIX32 ", sec_cstring_sz: 0x%" PRIX64 "\n", s64.addr, s64.offset, s64.size);
                     }
                 }
             }
