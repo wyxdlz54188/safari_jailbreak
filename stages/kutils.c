@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <mach/mach.h>
-#include "common.h"
-#include "time_saved/time_saved.h"
 #include <asl.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CommonCrypto/CommonDigest.h>
@@ -12,48 +10,37 @@
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
 #include <spawn.h>
+
+#include "common.h"
 #include "csblob.h"
-
-extern uint64_t kern_struct_proc;
-
-void set_csflags(uint64_t proc) {
-    uint32_t csflags = rk32(proc + koffset(KSTRUCT_OFFSET_PROC_CSFLAGS));
-    csflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
-    wk32(proc + koffset(KSTRUCT_OFFSET_PROC_CSFLAGS), csflags);
-}
-
-void set_tfplatform(uint64_t proc) {
-    // task.t_flags & TF_PLATFORM
-    uint64_t task = rk64(proc + koffset(KSTRUCT_OFFSET_PROC_TASK));
-    uint32_t t_flags = rk32(task + koffset(KSTRUCT_OFFSET_TASK_FLAGS));
-    
-    t_flags |= TF_PLATFORM;
-    wk32(task+koffset(KSTRUCT_OFFSET_TASK_FLAGS), t_flags);
-}
+#include "physpuppet/libprejailbreak.h"
+#include "physpuppet/utils.h"
 
 const uint64_t kernel_address_space_base = 0xffff000000000000;
-void Kernel_memcpy(uint64_t dest, uint64_t src, uint32_t length) {
+void kmemcpy(uint64_t dest, uint64_t src, uint32_t length) {
     if (dest >= kernel_address_space_base) {
         // copy to kernel:
-        kwrite(dest, (void*) src, length);
+        kwritebuf(dest, (void*) src, length);
     } else {
         // copy from kernel
-        kread(src, (void*)dest, length);
+        kreadbuf(src, (void*)dest, length);
     }
 }
 
-uint64_t proc_of_pid(pid_t pid) {
-    uint64_t proc = kern_struct_proc;
+uint64_t borrow_ucreds(pid_t to_pid, pid_t from_pid) {
+    uint64_t to_proc = proc_find(to_pid);
+    uint64_t from_proc = proc_find(from_pid);
     
-    while (true) {
-        if(rk32(proc + koffset(KSTRUCT_OFFSET_PROC_PID)) == pid) {
-            return proc;
-        }
-        proc = rk64(proc + 8 /*off_p_list_le_prev*/);
-        if(!proc) {
-            return -1;
-        }
-    }
+    uint64_t to_ucred = kread64(to_proc + koffsetof(proc, ucred));
+    uint64_t from_ucred = kread64(from_proc + koffsetof(proc, ucred));
     
-    return 0;
+    kwrite64(to_proc + koffsetof(proc, ucred), from_ucred);
+    
+    return to_ucred;
+}
+
+void unborrow_ucreds(pid_t to_pid, uint64_t to_ucred) {
+    uint64_t to_proc = proc_find(to_pid);
+    
+    kwrite64(to_proc + koffsetof(proc, ucred), to_ucred);
 }

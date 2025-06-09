@@ -1,1 +1,1 @@
-int setHSP4();
+int patch_hsp4();

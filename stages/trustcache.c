@@ -1,23 +1,12 @@
-/*
- *  inject.m
- *  
- *  Created by Sam Bingner on 9/27/2018
- *  Copyright 2018 Sam Bingner. All Rights Reserved.
- *
- */
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <mach/mach.h>
 #include <dlfcn.h>
 #include <Security/Security.h>
 
 #include "trustcache.h"
-#include "time_saved/memory.h"
 #include "CSCommon.h"
-#include <asl.h>
-
-#define LOG(fmt, ...) \
-    asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] " fmt, ##__VA_ARGS__)
+#include "physpuppet/libprejailbreak.h"
+#include "log.h"
 
 OSStatus SecStaticCodeCreateWithPathAndAttributes(CFURLRef path, SecCSFlags flags, CFDictionaryRef attributes, SecStaticCodeRef  _Nullable *staticCode);
 OSStatus SecCodeCopySigningInformation(SecStaticCodeRef code, SecCSFlags flags, CFDictionaryRef  _Nullable *information);
@@ -141,13 +130,13 @@ uint8_t *cdhashFor(const char *filePath) {
     return bytes;
 }
 
-int injectTrustCache(char *path, uint64_t trust_chain) {
+int inject_trustcache(char *path, uint64_t trust_chain) {
     dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_NOW);
 
     struct trust_mem mem;
     uint64_t kernel_trust = 0;
 
-    mem.next = rk64(trust_chain);
+    mem.next = kread64(trust_chain);
     mem.count = 1;
     *(uint64_t *)&mem.uuid[0] = 0xabadbabeabadbabe;
     *(uint64_t *)&mem.uuid[8] = 0xabadbabeabadbabe;
@@ -159,7 +148,6 @@ int injectTrustCache(char *path, uint64_t trust_chain) {
     size_t length = (sizeof(mem) + TRUST_CDHASH_LEN + 0xFFFF) & ~0xFFFF;
     char *buffer = malloc(TRUST_CDHASH_LEN);
     if (buffer == NULL) {
-        LOG("Unable to allocate memory for cdhashes: %s\n", strerror(errno));
         return -3;
     }
     char *curbuf = buffer;
@@ -167,9 +155,9 @@ int injectTrustCache(char *path, uint64_t trust_chain) {
     curbuf += TRUST_CDHASH_LEN;
     kernel_trust = kalloc(length);
 
-    kwrite(kernel_trust, &mem, sizeof(mem));
-    kwrite(kernel_trust + sizeof(mem), buffer, TRUST_CDHASH_LEN);
-    wk64(trust_chain, kernel_trust);
+    kwritebuf(kernel_trust, &mem, sizeof(mem));
+    kwritebuf(kernel_trust + sizeof(mem), buffer, TRUST_CDHASH_LEN);
+    kwrite64(trust_chain, kernel_trust);
 
     return (int)errors;
 }

