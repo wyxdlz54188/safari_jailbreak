@@ -16,6 +16,21 @@
 #include "physpuppet/libprejailbreak.h"
 #include "physpuppet/utils.h"
 
+void set_csflags(uint64_t proc) {
+    uint32_t csflags = kread32(proc + koffsetof(proc, csflags));
+    csflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
+    kwrite32(proc + koffsetof(proc, csflags), csflags);
+}
+
+void set_tfplatform(uint64_t proc) {
+    // task.t_flags & TF_PLATFORM
+    uint64_t task = kread64(proc + koffsetof(proc, task));
+    uint32_t t_flags = kread32(task + koffsetof(task, flags));
+    
+    t_flags |= TF_PLATFORM;
+    kwrite32(task+koffsetof(task, flags), t_flags);
+}
+
 const uint64_t kernel_address_space_base = 0xffff000000000000;
 void kmemcpy(uint64_t dest, uint64_t src, uint32_t length) {
     if (dest >= kernel_address_space_base) {

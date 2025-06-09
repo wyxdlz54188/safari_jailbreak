@@ -3,6 +3,7 @@
 import subprocess
 
 # Build stage3
+subprocess.run(['rm', 'stage3.h'], check=False)
 subprocess.run(['make', 'clean'], check=True, cwd='stage3')
 subprocess.run(['rm', '-rf', '.theos'], check=True, cwd='stage3')
 subprocess.run(['make'], check=True, cwd='stage3')

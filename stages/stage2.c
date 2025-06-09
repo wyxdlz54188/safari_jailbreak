@@ -61,10 +61,13 @@ int extract_stage3(void) {
 }
 
 int main() {
-  LOG("[stage2] loaded");
+  LOG("loaded");
 
   kernel_rw_init();
   tfp0_init();
+
+  set_csflags(pinfo(proc));
+  set_tfplatform(pinfo(proc));
 
   uint64_t self_ucred = borrow_ucreds(getpid(), 1);
 

@@ -65,15 +65,16 @@ int rejailbreak_chimera(void) {
     injectTrustCache(files, g_trustcache);
 
     int jailbreakd_status = start_jailbreakd(g_kbase, get_allproc(), kernelsignpost_addr);
-    // LOG(@"jailbreakd_status = %d", jailbreakd_status);
+    LOG(@"jailbreakd_status = %d", jailbreakd_status);
     // if(jailbreakd_status != 0)     goto err;
     
-    // sleep(2);
-    // log_launchctl_list();
+    sleep(2);
+    log_launchctl_list();
 
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
     LOG(@"start_jailbreakd success");
+
 
     // jailbreakd_client, launchd_pid, 1 (1 = entitle+platformize the target PID)
     int rv = 0;
@@ -194,4 +195,43 @@ int run_userspace_reboot(void) {
     } else {
         LOG(@"posix_spawn: %d(%s)\n", status, strerror(status));
     }
+}
+
+int log_launchctl_list(void) {
+    pid_t pid;
+    int status;
+
+    int fd = open("/var/launchctl_log.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        LOG(@"open");
+        return 1;
+    }
+
+    posix_spawn_file_actions_t file_actions;
+    posix_spawn_file_actions_init(&file_actions);
+    posix_spawn_file_actions_adddup2(&file_actions, fd, STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&file_actions, fd, STDERR_FILENO);
+
+    char *argv[] = {"/chimera/launchctl", "list", NULL};
+
+    int ret = posix_spawn(&pid, argv[0], &file_actions, NULL, argv, NULL);
+    if (ret != 0) {
+        LOG(@"posix_spawn ret: %d", ret);
+        close(fd);
+        return 1;
+    }
+    LOG(@"posix_spawn ret: %d", ret);
+
+    waitpid(pid, &status, 0);
+
+    posix_spawn_file_actions_destroy(&file_actions);
+    close(fd);
+
+    if (WIFEXITED(status)) {
+        LOG(@"launchctl list exited with status %d\n", WEXITSTATUS(status));
+    } else {
+        LOG(@"launchctl list did not exit normally\n");
+    }
+
+    return 0;
 }
