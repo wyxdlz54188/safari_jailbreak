@@ -203,11 +203,11 @@ pfinder_trustcache(pfinder_t pfinder)
     uint32_t insns[4];
     
     for(; sec_read_buf(pfinder.sec_text, ref, insns, sizeof(insns)) == KERN_SUCCESS; ref += sizeof(*insns)) {
-        // 5F 01 09 6B E0 09 00 54 08 01 40 F9 C8 F7 FF B5
-        if (insns[0] == 0x6B09015F
-            && insns[1] == 0x540009E0
+        // 4A FD 41 D3 6A F2 FF B5 08 01 40 F9 A8 F1 FF B5
+        if (insns[0] == 0xD341FD4A
+            && insns[1] == 0xB5FFF26A
             && insns[2] == 0xF9400108
-            && insns[3] == 0xB5FFF7C8) {
+            && insns[3] == 0xB5FFF1A8) {
             found = true;
             break;
         }
@@ -234,11 +234,11 @@ pfinder_zone_map_ref(pfinder_t pfinder)
     uint32_t insns[4];
     
     for(; sec_read_buf(pfinder.sec_text, ref, insns, sizeof(insns)) == KERN_SUCCESS; ref += sizeof(*insns)) {
-        // 88 7E 5F C8 1F 01 13 EB C1 07 00 54 9F FE 08 C8
-        if (insns[0] == 0xC85F7E88
-            && insns[1] == 0xEB13011F
-            && insns[2] == 0x540007C1
-            && insns[3] == 0xC808FE9F) {
+        // 08 50 4F A9 96 0A C8 9A C8 C2 21 8B 15 05 00 D1
+        if ((insns[0] & 0xffff0000) == 0xa94f0000   //ldp something
+            && insns[1] == 0x9AC80A96
+            && insns[2] == 0x8B21C2C8
+            && insns[3] == 0xD1000515) {
             found = true;
             break;
         }
