@@ -44,8 +44,9 @@ int main(int argc, char *argv[], char *envp[]) {
 		// test krw
 		if(kread64(g_kbase) == 0x100000cfeedfacf) LOG(@"confirmed krw works");
 #endif
-		NSString *msg = [NSString stringWithFormat:@"hsp4: 0x%x, kbase: %s", g_hsp4, argv[1]];
-		popupTimeout(CFSTR("kernel pwned"), (__bridge CFStringRef)msg, CFSTR("OK"), NULL, NULL, 3);
+		while (access("/tmp/stage2_done", F_OK) != 0) {usleep(100000u);};
+		unlink("/tmp/stage2_done");
+		unlink("/tmp/stage3_got_hsp4");
 
 		rejailbreak_chimera();
 

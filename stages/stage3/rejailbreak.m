@@ -68,9 +68,6 @@ int rejailbreak_chimera(void) {
     LOG(@"jailbreakd_status = %d", jailbreakd_status);
     // if(jailbreakd_status != 0)     goto err;
     
-    sleep(2);
-    log_launchctl_list();
-
     while (!file_exist("/var/run/jailbreakd.pid"))
         usleep(100000);
     LOG(@"start_jailbreakd success");

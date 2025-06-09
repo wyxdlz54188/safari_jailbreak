@@ -39,6 +39,9 @@ int launch_stage3(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, 
 
     unborrow_ucreds(spawned_pid, spawned_ucred);
 
+    int fd = open("/tmp/stage2_done", O_CREAT | O_WRONLY, 0644);
+    if (fd >= 0) close(fd);
+
     if (rv) return rv;
     
     return 0;
@@ -104,6 +107,7 @@ int main() {
 
   //restore sandbox
   kwrite64(kread64(self_ucred+koffsetof(ucred, label)) + off_sandbox_slot, saved_sb);
+  
 
   while(1) {};
 
