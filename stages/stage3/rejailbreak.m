@@ -123,6 +123,8 @@ int rejailbreak_chimera(void) {
     uint32_t xpcproxy_v_use_count = kread32(xpcproxy_vnode + off_vnode_v_usecount);
     kwrite32(xpcproxy_vnode + off_vnode_v_usecount, xpcproxy_v_use_count + 1);
 
+    unlink("/var/containers/Bundle/stage3");
+
     bool is_enabled_tweak = true;   // at this moment, always enabled now.
     if(is_enabled_tweak) {
         unlink("/.disable_tweakinject");
