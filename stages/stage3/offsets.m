@@ -50,8 +50,6 @@ uint32_t off_cs_blob_csb_platform_binary = 0;
 uint32_t off_u_cr_svuid = 0;
 uint32_t off_u_cr_label = 0;
 
-uint64_t off_allproc = 0;
-
 void offsets_init(void) {
     if (!(SYSTEM_VERSION_EQUAL_TO(@"12.5.7"))) {
         LOG(@"Only supported offset for iOS 12.5.7");
@@ -100,7 +98,5 @@ void offsets_init(void) {
 
         off_u_cr_svuid = 0x20;
         off_u_cr_label = 0x78;
-
-        off_allproc = 0xfffffff0088d96e8;
     }
 }

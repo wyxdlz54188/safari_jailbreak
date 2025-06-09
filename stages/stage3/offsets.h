@@ -40,6 +40,4 @@ extern uint32_t off_cs_blob_csb_platform_binary;
 extern uint32_t off_u_cr_svuid;
 extern uint32_t off_u_cr_label;
 
-extern uint64_t off_allproc;
-
 void offsets_init(void);
