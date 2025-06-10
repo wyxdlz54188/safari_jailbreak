@@ -67,7 +67,7 @@ const offsets_obj = {
             this.regloader = 0x25D18;
         }
         else {
-            throw "Unknown platform: " + navigator.userAgent;
+            // throw "Unknown platform: " + navigator.userAgent;
         }
     }
 };

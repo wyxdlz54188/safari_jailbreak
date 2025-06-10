@@ -29,7 +29,6 @@ kreadbuf_wrapper(kaddr_t addr, void *buf, size_t sz) {
     return KERN_SUCCESS;
 }
 
-
 void
 sec_reset(sec_64_t *sec) {
     memset(&sec->s64, '\0', sizeof(sec->s64));
@@ -215,7 +214,7 @@ pfinder_trustcache(pfinder_t pfinder)
     if(!found)
         return 0;
     
-    // step into low address
+    // step into high address
     for(; sec_read_buf(pfinder.sec_text, ref, insns, sizeof(insns)) == KERN_SUCCESS; ref += sizeof(*insns)) {
         if(IS_ADRP(insns[0])) {
             break;
@@ -246,7 +245,7 @@ pfinder_zone_map_ref(pfinder_t pfinder)
     if(!found)
         return 0;
     
-    // step into low address
+    // step into high address
     for(; sec_read_buf(pfinder.sec_text, ref, insns, sizeof(insns)) == KERN_SUCCESS; ref += sizeof(*insns)) {
         if(IS_ADRP(insns[0])) {
             break;
