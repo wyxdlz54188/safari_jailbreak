@@ -1,12 +1,4 @@
 const offsets_obj = {
-    WEBCORE_BASE: undefined,
-    JSC_BASE: undefined,
-    COREAUDIO_BASE: undefined,
-    LIBCPP1_BASE: undefined,
-    LIBSYSTEM_PLATFORM_BASE: undefined,
-    LIBSYSTEM_KERNEL_BASE: undefined,
-    LIBDYLD_BASE: undefined,
-
     dlsym: undefined,
 
     __MergedGlobals_52: undefined,
@@ -35,14 +27,6 @@ const offsets_obj = {
         // Mozilla/5.0 (iPhone; CPU iPhone OS 12_5_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.2 Mobile/15E148 Safari/604.1
         if (navigator.userAgent.match(/iPhone OS 12_5_7/) && window.screen.width == 320 && window.screen.height == 568) {
             log("[i] offsets selected for iPhone 5s, iOS 12.5.7");
-            this.WEBCORE_BASE = 0x187F75C;
-            this.JSC_BASE = 0x1738000;
-            this.COREAUDIO_BASE = 0x5573000;
-            this.LIBCPP1_BASE = 0x976C000;
-            this.LIBSYSTEM_PLATFORM_BASE = 0x8CCE000;
-            this.LIBSYSTEM_KERNEL_BASE = 0x8D5D000;
-            this.LIBDYLD_BASE = 0x8E88000;
-
             this.dlsym = 0x4A08;
 
             this.__MergedGlobals_52 = 0x32559040;
