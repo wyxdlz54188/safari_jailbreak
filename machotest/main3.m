@@ -181,6 +181,7 @@ uint64_t find_symbol_address(uint64_t image_base, const char *symbol_name) {
             // printf("strtab_offset: %u\n", strtab_offset);
 
             char *current_symbol_name = (char*)(string_table + strtab_offset);
+            printf("[+] found symbol: %s\n", current_symbol_name);
             if (strcmp(current_symbol_name, symbol_name) == 0) {
                	uint64_t addr = symtable_n_value;
                	printf("[+] found symbol: %s at 0x%llx\n", current_symbol_name, addr);
@@ -198,12 +199,12 @@ uint64_t find_symbol_address(uint64_t image_base, const char *symbol_name) {
 int main(int argc, char *argv[], char *envp[]) {
 	@autoreleasepool {
 		printf("Hello world!\n");
-		const char* img_name = "libdyld";
+		const char* img_name = "libxpc";
 
 		uint64_t libdyld_base = get_image_base(img_name);
 		printf("libdyld_base: 0x%llx\n", libdyld_base);
 
-		const char *sym_to_find = "_dlsym";  // Mach-O 심볼명
+		const char *sym_to_find = "_dlsyddm";  // Mach-O 심볼명
 
 		uint64_t sym_addr = find_symbol_address(libdyld_base, sym_to_find);
     	if (!sym_addr) {

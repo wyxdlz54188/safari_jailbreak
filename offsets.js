@@ -1,6 +1,5 @@
 const offsets_obj = {
 
-    __MergedGlobals_52: undefined,
     memPoolStart: undefined,
     memPoolEnd: undefined,
 
@@ -22,7 +21,6 @@ const offsets_obj = {
         if (navigator.userAgent.match(/iPhone OS 12_5_7/) && window.screen.width == 320 && window.screen.height == 568) {
             log("[i] offsets selected for iPhone 5s, iOS 12.5.7");
 
-            this.__MergedGlobals_52 = 0x32559040;
             this.memPoolStart = 0xC8;
             this.memPoolEnd = 0xD0;
 

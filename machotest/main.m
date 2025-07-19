@@ -129,7 +129,7 @@ uint64_t find_symbol_address(uint64_t image_base, const char *symbol_name) {
 			uint32_t strtab_offset = sym_table[i].n_un.n_strx;
 			char *current_symbol_name = string_table + strtab_offset;
 
-			if (strcmp(current_symbol_name, symbol_name) == 0) {
+			if (strstr(current_symbol_name, symbol_name) != NULL) {
             	uint64_t addr = sym_table[i].n_value;
             	// printf("[+] found symbol: %s at 0x%llx\n", current_symbol_name, addr);
             	return addr - (uint64_t)text_segment->vmaddr;;
@@ -144,12 +144,13 @@ uint64_t find_symbol_address(uint64_t image_base, const char *symbol_name) {
 int main(int argc, char *argv[], char *envp[]) {
 	@autoreleasepool {
 		printf("Hello world!\n");
-		const char* img_name = "libdyld";
+        dlopen("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore", RTLD_NOW);
+		const char* img_name = "JavaScriptCore";
 
 		uint64_t libdyld_base = get_image_base(img_name);
 		printf("libdyld_base: 0x%llx\n", libdyld_base);
 
-		const char *sym_to_find = "_dlsym";  // Mach-O 심볼명
+		const char *sym_to_find = "MergedGlobals";  // Mach-O 심볼명
 
 		uint64_t sym_addr = find_symbol_address(libdyld_base, sym_to_find);
     	if (!sym_addr) {

