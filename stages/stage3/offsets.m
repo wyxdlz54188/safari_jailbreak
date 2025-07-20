@@ -51,13 +51,13 @@ uint32_t off_u_cr_svuid = 0;
 uint32_t off_u_cr_label = 0;
 
 void offsets_init(void) {
-    if (!(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.1"))) {
-        LOG(@"Only supported offset for iOS 12.1+");
+    if (!(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0"))) {
+        LOG(@"Only supported offset for iOS 12.0+");
         exit(EXIT_FAILURE);
     }
     
-    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.1")) {
-        LOG(@"offsets selected for iOS 12.1+\n");
+    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0")) {
+        LOG(@"offsets selected for iOS 12.0+\n");
 
         off_ipc_object_io_bits = 0x0;
         off_ipc_port_ip_receiver = 0x60;

