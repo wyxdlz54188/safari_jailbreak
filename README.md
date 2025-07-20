@@ -13,6 +13,7 @@ A7-A10 devices running iOS versions 12.0 through 12.5.x that have been jailbroke
 - Samuel Groß (CVE-2020-9802, Webkit Exploit)
 - CoolStar and all chimera jailbreak developers
 - JakeBlair420 and all TotallyNotSpyware developers (jop chaining, code-execution idea)
+- qwertyoruiop (Mach-O loader with +jitMemCpy)
 
 ## How to build & run
 ```
