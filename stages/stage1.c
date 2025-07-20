@@ -24,6 +24,8 @@ void fail(uint64_t x) {
 typedef void* (*t_dlsym)(void* handle, const char* symbol);
 typedef int (*t_asl_log)(void*, void*, int, const char*, ...);
 
+uint64_t memPoolStart = 0;
+
 #define IS_DEBUG 0
 
 void performJITMemcpy(t_dlsym _dlsym, void* dst, void* src, size_t size) {
@@ -33,9 +35,12 @@ void performJITMemcpy(t_dlsym _dlsym, void* dst, void* src, size_t size) {
 #endif
 
     uint64_t _jitWriteSeparateHeapsFunctionAddr = *(int64_t *)_dlsym(RTLD_DEFAULT, "_ZN3JSC29jitWriteSeparateHeapsFunctionE");
-    uint64_t (*_startOfFixedExecutableMemoryPoolImplEv)(void) = _dlsym(RTLD_DEFAULT, "_ZN3JSC36startOfFixedExecutableMemoryPoolImplEv");
-
-    uint64_t memPoolStart = _startOfFixedExecutableMemoryPoolImplEv();
+    // void *memPoolStartFunc = _dlsym(RTLD_DEFAULT, "_ZN3JSC36startOfFixedExecutableMemoryPoolImplEv");
+    // uint64_t memPoolStart = 0;
+    // if(memPoolStartFunc != NULL) {
+    //     uint64_t (*_startOfFixedExecutableMemoryPoolImplEv)(void) = memPoolStartFunc;
+    //     memPoolStart = _startOfFixedExecutableMemoryPoolImplEv();
+    // }
 
  #if IS_DEBUG
     _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] jitWriteSeparateHeapsFunctionAddr: 0x%llx", _jitWriteSeparateHeapsFunctionAddr);
@@ -240,7 +245,9 @@ void bindit(struct dyld_info_command* dyld_info,
     }
 }
 
-void load(void* buffer, t_dlsym _dlsym, void* jitend) {
+void load(void* buffer, t_dlsym _dlsym, void* jitend, uint64_t jitStart) {
+    memPoolStart = jitStart;
+
     t_asl_log _asl_log = (t_asl_log)_dlsym(RTLD_DEFAULT, "asl_log");
     _asl_log(NULL, NULL, ASL_LEVEL_ERR, "[stage1] loaded");
     

