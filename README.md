@@ -7,13 +7,12 @@ You can re-jailbreak using a webkit exploit without code-signing.
 A7-A10 devices running iOS versions 12.2 through 12.5.x that have been jailbroken at least once previously with Chimera.
 
 ## Credits
-- wh1te4ever
+- wh1te4ever (main developer)
 - alfiecg24 (stable kernel exploit)
 - felix-pb (kernel exploit)
 - Samuel Groß (CVE-2020-9802, Webkit Exploit)
 - CoolStar and all chimera jailbreak developers
 - JakeBlair420 and all TotallyNotSpyware developers (jop chaining, code-execution idea)
-
 
 ## How to build & run
 ```
